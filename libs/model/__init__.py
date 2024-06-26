@@ -1,4 +1,4 @@
-from .MMSA import *
-from .MMSAConfig import *
+from .TweetMSA import *
+from .TweetMSAConfig import *
 
-__all__ = ["MMSA", "MMSAConfig"]
+__all__ = ["TweetMSA", "TweetMSAConfig"]

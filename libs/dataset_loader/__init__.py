@@ -1,3 +1,3 @@
-from .MulTweEmoDataset import MulTweEmoDataset
+from .MulTweEmoDataset import *
 
-__all__ = ["MulTweEmoDataset"]
+__all__ = ["load"]

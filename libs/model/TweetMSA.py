@@ -1,5 +1,5 @@
-from .MMSAConfig import MMSAConfig
-from transformers import PreTrainedModel, AutoModel, AutoProcessor
+from .TweetMSAConfig import TweetMSAConfig
+from transformers import PreTrainedModel, AutoModel, AutoProcessor, PretrainedConfig
 from torch import nn, concatenate
 import torch.nn.functional as F
 from PIL import Image
@@ -7,18 +7,22 @@ import requests
 from io import BytesIO
 
 
-class MMSA(PreTrainedModel):
-    def __init__(self, config):
+# TODO weight initialization
+
+class TweetMSA(PreTrainedModel):
+    def __init__(self, config: PretrainedConfig) -> None:
         super().__init__(config)
 
         # Load model directly
         self.processor = AutoProcessor.from_pretrained(config.feature_extractor_name, trust_remote_code=True)
+        
         self.feature_extractor = AutoModel.from_pretrained(config.feature_extractor_name, trust_remote_code=True)
-        self.fc1 = nn.Linear(self.feature_extractor.config.projection_dim*2, 50)
-        self.fc2 = nn.Linear(50, 10)
+        self.fc1 = nn.Linear(self.feature_extractor.config.projection_dim*2, 512)
+        self.fc2 = nn.Linear(512, 10)
 
         self.sigmoid = nn.Sigmoid()
         self.criterion = nn.BCELoss()
+        
         self.to(self.device)
     
     def forward(self, text_inputs, image_inputs, labels=None):
