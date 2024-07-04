@@ -94,6 +94,8 @@ def _create_csv(raw_dataset_path="./dataset/raw/MulTweEmo_raw.pkl", csv_path="./
         path where the csv will be saved, by default "./dataset/MulTweEmo.csv"
     image_path : str, optional
         path where the images are, by default "./dataset/images"
+    force_override : bool, optional
+        flag to force setup of dataset from the start, by default False
     """
     dataset = _prepare_dataset(raw_dataset_path)
 
@@ -101,13 +103,17 @@ def _create_csv(raw_dataset_path="./dataset/raw/MulTweEmo_raw.pkl", csv_path="./
     for label in labels:
         dataset[label] = dataset[label].apply(lambda x: 1 if x>=2 else 0)
 
-    # TODO decide how to handle tweets with multiple images
-    dataset["img_path"] = dataset["id"].apply(lambda x : f"{image_path}/{x}_0.jpg")
+    
+    dataset["img_path"] = dataset["img_count"].apply(lambda x : range(x))
+    dataset = dataset.explode("img_path")
+    dataset["img_path"] = dataset.apply(lambda x : f"{image_path}/{x['id']}_{x['img_path']}.jpg", axis=1)
     columns = ["id", "tweet", "img_path"] + labels
     dataset.to_csv(csv_path, columns=columns, index=False)
 
 
-def load(mode="M", raw_dataset_path="./dataset/raw/MulTweEmo_raw.pkl", csv_path="./dataset/MulTweEmo.csv", image_path="./dataset/images", image_zip_path="dataset/raw/images.zip")->Dataset:
+def load(mode="M", raw_dataset_path="./dataset/raw/MulTweEmo_raw.pkl", csv_path="./dataset/MulTweEmo.csv", 
+        image_path="./dataset/images", image_zip_path="dataset/raw/images.zip", force_override=False)->Dataset:
+        
     """function to load the MulTweEmo dataset, downloads dataset if not cached. The processed dataset for further uses is also saved as a csv
 
     Parameters
@@ -122,6 +128,8 @@ def load(mode="M", raw_dataset_path="./dataset/raw/MulTweEmo_raw.pkl", csv_path=
         where to extract the images of the dataset, by default "./dataset/images"
     image_zip_path : str, optional
         where to save the downloaded zip atchive containing the images, by default "dataset/raw/images.zip"
+    force_override : bool, optional
+        flag to force setup of dataset from the start, by default False
 
     Returns
     -------
@@ -135,7 +143,7 @@ def load(mode="M", raw_dataset_path="./dataset/raw/MulTweEmo_raw.pkl", csv_path=
     """
 
     # if the csv with the processed dataset does not exist yet, create it
-    if not exists(csv_path):
+    if not exists(csv_path) or force_override:
         _create_csv(raw_dataset_path=raw_dataset_path, csv_path=csv_path, image_path=image_path)
 
     dataset = load_dataset("csv", data_files=csv_path, split="train")
