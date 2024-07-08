@@ -10,17 +10,31 @@ from io import BytesIO
 # TODO weight initialization
 
 class TweetMSA(PreTrainedModel):
-    def __init__(self, config: PretrainedConfig) -> None:
+    def __init__(self, config: TweetMSAConfig) -> None:
         super().__init__(config)
 
         # Load model directly
         self.processor = AutoProcessor.from_pretrained(config.feature_extractor_name, trust_remote_code=True)
         
         self.feature_extractor = AutoModel.from_pretrained(config.feature_extractor_name, trust_remote_code=True)
-        self.fc1 = nn.Linear(self.feature_extractor.config.projection_dim*2, 512)
-        self.fc2 = nn.Linear(512, 10)
 
-        self.sigmoid = nn.Sigmoid()
+        # TODO: polish structure of classifier
+        self.fc_layers = nn.ModuleList()
+
+        # layer 1
+        self.fc_layers.append(nn.Linear(self.feature_extractor.config.projection_dim*2, 512))
+        self.fc_layers.append(nn.Dropout(config.dropout_p))
+        self.fc_layers.append(nn.LeakyReLU())
+
+        #layer 2
+        self.fc_layers.append(nn.Linear(512, 512))
+        self.fc_layers.append(nn.Dropout(config.dropout_p))  
+        self.fc_layers.append(nn.LeakyReLU())
+
+        # output layer
+        self.fc_layers.append(nn.Linear(512, 10))
+        self.fc_layers.append(nn.Sigmoid())
+
         self.criterion = nn.BCELoss()
         
         self.to(self.device)
@@ -49,10 +63,11 @@ class TweetMSA(PreTrainedModel):
         text_embedding = self.feature_extractor.get_text_features(input_ids=input_ids, attention_mask=attention_mask).to(self.device)
         image_embedding = self.feature_extractor.get_image_features(pixel_values=pixel_values).to(self.device)
 
-        x = self.fc1(concatenate((text_embedding, image_embedding), axis=-1))
-        x = self.fc2(x)
+        logits = concatenate((text_embedding, image_embedding), axis=-1)
 
-        logits = self.sigmoid(x)
+        for layer in self.fc_layers:
+            logits = layer(logits)
+
         if labels is not None :
             loss = self.criterion(logits, labels)
             return {"loss": loss, "logits": logits}

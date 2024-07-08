@@ -10,6 +10,7 @@ class TweetMSAConfig(PretrainedConfig):
         feature_extractor: str ="jinaai/jina-clip-v1",
         feature_extractor_config: PretrainedConfig = None,
         device: str = None,
+        dropout_p = 0.2,
         **kwargs) -> None:
       
       if feature_extractor not in ["jinaai/jina-clip-v1", "openai/clip-vit-base-patch32", "openai/clip-vit-large-patch14"]:
@@ -30,4 +31,6 @@ class TweetMSAConfig(PretrainedConfig):
           self.device = torch.device("cpu")
       else:
         raise ValueError("cpu and gpu are the only values accepted")
+      
+      self.dropout_p = dropout_p
       super().__init__(**kwargs)

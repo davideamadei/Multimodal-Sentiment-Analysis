@@ -4,6 +4,7 @@ from os.path import exists
 from pathlib import PurePath
 from datasets import load_dataset, Dataset
 from zipfile import ZipFile
+import re
 
 # a list of the possible labels for the dataset
 labels = ['anger', 'anticipation', 'disgust', 'fear', 'joy', 'neutral', 'sadness', 'something else', 'surprise', 'trust']
@@ -111,8 +112,10 @@ def _create_csv(raw_dataset_path="./dataset/raw/MulTweEmo_raw.pkl", csv_path="./
     dataset.to_csv(csv_path, columns=columns, index=False)
 
 
+# TODO add options for loading i.e. preprocess tweets, build label matrix etc
 def load(mode="M", raw_dataset_path="./dataset/raw/MulTweEmo_raw.pkl", csv_path="./dataset/MulTweEmo.csv", 
-        image_path="./dataset/images", image_zip_path="dataset/raw/images.zip", force_override=False)->Dataset:
+        image_path="./dataset/images", image_zip_path="dataset/raw/images.zip",
+        force_override=False, preprocess_tweets=True, build_label_matrix=True)->Dataset:
         
     """function to load the MulTweEmo dataset, downloads dataset if not cached. The processed dataset for further uses is also saved as a csv
 
@@ -130,6 +133,10 @@ def load(mode="M", raw_dataset_path="./dataset/raw/MulTweEmo_raw.pkl", csv_path=
         where to save the downloaded zip atchive containing the images, by default "dataset/raw/images.zip"
     force_override : bool, optional
         flag to force setup of dataset from the start, by default False
+    preprocess_tweets : bool, optional
+        flag to decide application of tweet preprocessing, by default True
+    build_label_matrix : bool, optional
+        flag to also add labels as a list of lists, by default True
 
     Returns
     -------
@@ -170,11 +177,60 @@ def load(mode="M", raw_dataset_path="./dataset/raw/MulTweEmo_raw.pkl", csv_path=
         rename_map[feature] = feature[2:].lower()
     dataset = dataset.rename_columns(rename_map)
 
+    # preprocess tweets if necessary
+    if preprocess_tweets:
+        dataset = dataset.map(_preprocess_tweet)
+
+    if build_label_matrix:
+        dataset = dataset.add_column("labels", _build_label_matrix(dataset))
+
     return dataset
 
-def build_label_matrix(dataset):
+# TODO potentially handle emoji, urls, mentions with substitution instead of removal
+def _preprocess_tweet(input: dict):
+    tweet = input["tweet"]
+
+    # remove emoji
+    emoji_pattern = re.compile("["
+        u"\U0001F600-\U0001F64F"  # emoticons
+        u"\U0001F300-\U0001F5FF"  # symbols & pictographs
+        u"\U0001F680-\U0001F6FF"  # transport & map symbols
+        u"\U0001F1E0-\U0001F1FF"  # flags (iOS)
+        u"\U00002500-\U00002BEF"  # chinese char
+        u"\U00002702-\U000027B0"
+        u"\U000024C2-\U0001F251"
+        u"\U0001f926-\U0001f937"
+        u"\U00010000-\U0010ffff"
+        u"\u2640-\u2642" 
+        u"\u2600-\u2B55"
+        u"\u200d"
+        u"\u23cf"
+        u"\u23e9"
+        u"\u231a"
+        u"\ufe0f"  # dingbats
+        u"\u3030"
+        "]+", flags=re.UNICODE)
+    tweet = re.sub(emoji_pattern,'',tweet)
+
+    # remove urls
+    url_pattern = re.compile(r'https?://\S+|www\.\S+?')
+    tweet = re.sub(url_pattern,'', tweet)
+
+    # remove @ mentions and hashes
+    hash_pattern = re.compile("#")
+    tweet = re.sub(hash_pattern,"",tweet)
+
+    mention_pattern = re.compile("@[A-Za-z0–9_]+")
+    tweet = re.sub(mention_pattern,"",tweet)
+    
+    and_pattern = re.compile("&amp;")
+    tweet = re.sub(and_pattern,"&",tweet)
+
+    input["tweet"] = tweet
+    return input
+
+def _build_label_matrix(dataset):
     global labels
-    features = dataset.features
     label_matrix = []
     for elem in dataset:
         label_row = []
