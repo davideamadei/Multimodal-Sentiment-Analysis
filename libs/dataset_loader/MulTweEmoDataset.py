@@ -115,7 +115,7 @@ def _create_csv(raw_dataset_path="./dataset/raw/MulTweEmo_raw.pkl", csv_path="./
 # TODO add options for loading i.e. preprocess tweets, build label matrix etc
 def load(mode="M", raw_dataset_path="./dataset/raw/MulTweEmo_raw.pkl", csv_path="./dataset/MulTweEmo.csv", 
         image_path="./dataset/images", image_zip_path="dataset/raw/images.zip",
-        force_override=False, preprocess_tweets=True, build_label_matrix=True)->Dataset:
+        force_override=False, preprocess_tweets=True, build_label_matrix=True, automated_captions=False)->Dataset:
         
     """function to load the MulTweEmo dataset, downloads dataset if not cached. The processed dataset for further uses is also saved as a csv
 
@@ -184,6 +184,18 @@ def load(mode="M", raw_dataset_path="./dataset/raw/MulTweEmo_raw.pkl", csv_path=
     if build_label_matrix:
         dataset = dataset.add_column("labels", _build_label_matrix(dataset))
 
+    # remove rows without a label
+    id_list = []
+    global labels
+
+    for i, elem in enumerate(dataset):
+    # iterate on labels, if one with a non zero value is found the row is kept
+        for emotion in labels:
+            if elem[emotion] != 0:
+                id_list.append(i)
+                break
+    dataset = dataset.select(id_list)
+
     return dataset
 
 # TODO potentially handle emoji, urls, mentions with substitution instead of removal
@@ -223,6 +235,7 @@ def _preprocess_tweet(input: dict):
     mention_pattern = re.compile("@[A-Za-z0–9_]+")
     tweet = re.sub(mention_pattern,"",tweet)
     
+    # remove occurrences of &amp;
     and_pattern = re.compile("&amp;")
     tweet = re.sub(and_pattern,"&",tweet)
 

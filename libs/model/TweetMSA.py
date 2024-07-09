@@ -21,19 +21,23 @@ class TweetMSA(PreTrainedModel):
         # TODO: polish structure of classifier
         self.fc_layers = nn.ModuleList()
 
-        # layer 1
-        self.fc_layers.append(nn.Linear(self.feature_extractor.config.projection_dim*2, 512))
-        self.fc_layers.append(nn.Dropout(config.dropout_p))
-        self.fc_layers.append(nn.LeakyReLU())
+        input_layer = nn.Sequential()
+        input_layer.append(nn.Linear(self.feature_extractor.config.projection_dim*2, 512))
+        input_layer.append(nn.Dropout(config.dropout_p))
+        input_layer.append(nn.LeakyReLU())
+        self.fc_layers.append(input_layer)
+        
+        for i in range(config.n_layers):
+            layer = nn.Sequential()
+            layer.append(nn.Linear(512, 512))
+            layer.append(nn.Dropout(config.dropout_p))
+            layer.append(nn.LeakyReLU())
+            self.fc_layers.append(layer)        
 
-        #layer 2
-        self.fc_layers.append(nn.Linear(512, 512))
-        self.fc_layers.append(nn.Dropout(config.dropout_p))  
-        self.fc_layers.append(nn.LeakyReLU())
-
-        # output layer
-        self.fc_layers.append(nn.Linear(512, 10))
-        self.fc_layers.append(nn.Sigmoid())
+        output_layer = nn.Sequential()
+        output_layer.append(nn.Linear(512, 10))
+        output_layer.append(nn.Sigmoid())
+        self.fc_layers.append(output_layer)
 
         self.criterion = nn.BCELoss()
         

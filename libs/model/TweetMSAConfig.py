@@ -10,14 +10,14 @@ class TweetMSAConfig(PretrainedConfig):
         feature_extractor: str ="jinaai/jina-clip-v1",
         feature_extractor_config: PretrainedConfig = None,
         device: str = None,
-        dropout_p = 0.2,
+        dropout_p: float = 0.2,
+        n_layers: int = 1,
         **kwargs) -> None:
       
       if feature_extractor not in ["jinaai/jina-clip-v1", "openai/clip-vit-base-patch32", "openai/clip-vit-large-patch14"]:
         raise ValueError("Only the following models are accepted:\n" + "\n".join(["jinaai/jina-clip-v1", "openai/clip-vit-base-patch32", "openai/clip-vit-large-patch14"]))
-      
-      self.feature_extractor_name = feature_extractor
-      self.feature_extractor_config = feature_extractor_config
+      if n_layers < 0:
+        raise ValueError("the number of layers must be a positive integer")
       
       if device is None:
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -32,5 +32,17 @@ class TweetMSAConfig(PretrainedConfig):
       else:
         raise ValueError("cpu and gpu are the only values accepted")
       
+      if dropout_p > 1 or dropout_p < 0:
+        raise ValueError("dropout rate must be between 0 and 1")
+
+      self.feature_extractor_name = feature_extractor
+      self.feature_extractor_config = feature_extractor_config
+
+
       self.dropout_p = dropout_p
+
+      self.n_layers = n_layers
+
+
+
       super().__init__(**kwargs)
