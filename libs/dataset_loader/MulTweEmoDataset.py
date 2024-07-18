@@ -130,6 +130,8 @@ def _create_csv(raw_dataset_path="./dataset/raw/MulTweEmo_raw.pkl", csv_path="./
 
         dataset["caption"] = captions
         columns = columns + ["caption"]
+        del processor
+        del model
 
     dataset.to_csv(csv_path, columns=columns, index=False, mode="w+")
 
