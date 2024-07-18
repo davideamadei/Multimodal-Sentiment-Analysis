@@ -18,7 +18,6 @@ class TweetMSA(PreTrainedModel):
         
         self.feature_extractor = AutoModel.from_pretrained(config.feature_extractor_name, trust_remote_code=True)
 
-        # TODO: polish structure of classifier
         self.fc_layers = nn.ModuleList()
 
         input_layer = nn.Sequential()
@@ -41,11 +40,20 @@ class TweetMSA(PreTrainedModel):
 
         self.criterion = nn.BCELoss()
         
+        self.fc_layers.apply(self._init_weights)
+
         self.to(self.device)
     
-    def preprocess(self, text_inputs, image_inputs):
+    
+    def _init_weights(self, m):
+        if isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
+            nn.init.xavier_normal_(m.weight)
+            m.bias.data.fill_(0.01)
+
+    def preprocess_dataset(self, dataset, text_column="tweet", image_column="img_path"):
+        
         processed_images= []
-        for img in image_inputs:
+        for img in dataset[image_column]:
             if isinstance(img, str):
                 if img.startswith('http'):
                     response = requests.get(img)
@@ -59,13 +67,21 @@ class TweetMSA(PreTrainedModel):
 
             processed_images.append(image)
 
+        processed_inputs = self.processor(
+                                        text = dataset[text_column], 
+                                        images = processed_images, 
+                                        padding=True, return_tensors="pt", truncation=True
+                                        )
 
-        processed_inputs = self.processor(text = text_inputs, images = processed_images, padding=True)
-        return processed_inputs
+        dataset = dataset.add_column("input_ids", processed_inputs["input_ids"].tolist())
+        dataset = dataset.add_column("attention_mask", processed_inputs["attention_mask"].tolist())
+        dataset = dataset.add_column("pixel_values", processed_inputs["pixel_values"].tolist())
+
+        return dataset
 
     def forward(self, input_ids, attention_mask, pixel_values, labels=None):
-        text_embedding = self.feature_extractor.get_text_features(input_ids=input_ids, attention_mask=attention_mask).to(self.device)
-        image_embedding = self.feature_extractor.get_image_features(pixel_values=pixel_values).to(self.device)
+        text_embedding = self.feature_extractor.get_text_features(input_ids=input_ids, attention_mask=attention_mask)
+        image_embedding = self.feature_extractor.get_image_features(pixel_values=pixel_values)
 
         logits = concatenate((text_embedding, image_embedding), axis=-1)
 

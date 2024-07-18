@@ -2,12 +2,19 @@ import pandas as pd
 import gdown
 from os.path import exists
 from pathlib import PurePath
-from datasets import load_dataset, Dataset
+from datasets import load_dataset, DatasetDict
 from zipfile import ZipFile
 import re
+from transformers import BlipProcessor, BlipForConditionalGeneration
+from PIL import Image
+import torch
+import html
+
 
 # a list of the possible labels for the dataset
-labels = ['anger', 'anticipation', 'disgust', 'fear', 'joy', 'neutral', 'sadness', 'something else', 'surprise', 'trust']
+
+def get_labels():
+    return ['anger', 'anticipation', 'disgust', 'fear', 'joy', 'neutral', 'sadness', 'something else', 'surprise', 'trust']
 
 # TODO could add a config for the paths
  
@@ -32,11 +39,13 @@ def _download_raw(raw_dataset_path="./dataset/raw/MulTweEmo_raw.pkl", image_zip_
     gdown.download(text_url, raw_dataset_path, quiet=False, resume=True)
 
 
-def _extract_images(image_zip_path="dataset/raw/images.zip", image_path="./dataset/images") -> None:
+def _extract_images(files_to_extract: list[str], image_zip_path="dataset/raw/images.zip", image_path="./dataset/images") -> None:
     """utility function to extract images from the zip archive
 
     Parameters
     ----------
+    files_to_extract : list[str]
+        list of files to extract
     image_zip_path : str, optional
         path where the zip archive is saved, by default "dataset/raw/images.zip"
     image_path : str, optional
@@ -49,7 +58,7 @@ def _extract_images(image_zip_path="dataset/raw/images.zip", image_path="./datas
         for info in zfile.infolist():
             if not info.is_dir():
                 info.filename=PurePath(info.filename).name
-                if not exists(f"{image_path}/{info.filename}"):
+                if info.filename in files_to_extract and not exists(f"{image_path}/{info.filename}"):
                     zfile.extract(info, image_path)
     
 
@@ -84,7 +93,7 @@ def _prepare_dataset(raw_dataset_path="./dataset/raw/MulTweEmo_raw.pkl") -> pd.D
     return raw_dataset
     
 
-def _create_csv(raw_dataset_path="./dataset/raw/MulTweEmo_raw.pkl", csv_path="./dataset/MulTweEmo.csv", image_path="./dataset/images")->None:
+def _create_csv(raw_dataset_path="./dataset/raw/MulTweEmo_raw.pkl", csv_path="./dataset/MulTweEmo.csv", image_path="./dataset/images", generate_captions=False)->None:
     """utility function to save the csv file containing the processed dataset
 
     Parameters
@@ -95,27 +104,40 @@ def _create_csv(raw_dataset_path="./dataset/raw/MulTweEmo_raw.pkl", csv_path="./
         path where the csv will be saved, by default "./dataset/MulTweEmo.csv"
     image_path : str, optional
         path where the images are, by default "./dataset/images"
-    force_override : bool, optional
-        flag to force setup of dataset from the start, by default False
+    generate_captions : bool, optional
+        flag to decide if captions have to be generated, by default False
     """
     dataset = _prepare_dataset(raw_dataset_path)
-
     labels = dataset.columns[dataset.columns.str.startswith("M_") | dataset.columns.str.startswith("T_")].to_list()
     for label in labels:
         dataset[label] = dataset[label].apply(lambda x: 1 if x>=2 else 0)
 
-    
-    dataset["img_path"] = dataset["img_count"].apply(lambda x : range(x))
-    dataset = dataset.explode("img_path")
-    dataset["img_path"] = dataset.apply(lambda x : f"{image_path}/{x['id']}_{x['img_path']}.jpg", axis=1)
-    columns = ["id", "tweet", "img_path"] + labels
-    dataset.to_csv(csv_path, columns=columns, index=False)
+    dataset["img_name"] = dataset["img_count"].apply(lambda x : range(x))
+    dataset = dataset.explode("img_name")
+    dataset["img_name"] = dataset.apply(lambda x : f"{x['id']}_{x['img_name']}.jpg", axis=1)
+    columns = ["id", "tweet", "img_name"] + labels
+
+    # TODO: change to proper model
+    if generate_captions:
+        processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-base")
+        model = BlipForConditionalGeneration.from_pretrained("Salesforce/blip-image-captioning-base", torch_dtype=torch.float16).to("cuda")
+
+        images = [Image.open(f"{image_path}/{x}").convert("RGB") for x in dataset["img_name"]]
+        processed_images = processor(images, return_tensors="pt").to("cuda", torch.float16)
+
+        out = model.generate(**processed_images)
+        captions = processor.batch_decode(out, skip_special_tokens=True)
+
+        dataset["caption"] = captions
+        columns = columns + ["caption"]
+
+    dataset.to_csv(csv_path, columns=columns, index=False, mode="w+")
 
 
-# TODO add options for loading i.e. preprocess tweets, build label matrix etc
 def load(mode="M", raw_dataset_path="./dataset/raw/MulTweEmo_raw.pkl", csv_path="./dataset/MulTweEmo.csv", 
         image_path="./dataset/images", image_zip_path="dataset/raw/images.zip",
-        force_override=False, preprocess_tweets=True, build_label_matrix=True, automated_captions=False)->Dataset:
+        force_override=False, extract_images=True, preprocess_tweets=True, build_label_matrix=True, drop_something_else=True,
+        generate_captions=False, test_split=0.2, seed:int=None)->DatasetDict:
         
     """function to load the MulTweEmo dataset, downloads dataset if not cached. The processed dataset for further uses is also saved as a csv
 
@@ -128,20 +150,28 @@ def load(mode="M", raw_dataset_path="./dataset/raw/MulTweEmo_raw.pkl", csv_path=
     csv_path : str, optional
         where to save the processed dataset, by default "./dataset/MulTweEmo.csv"
     image_path : str, optional
-        where to extract the images of the dataset, by default "./dataset/images"
+        path where the images are located, and where they will be extracted if extract_images is set to True, by default "./dataset/images"
     image_zip_path : str, optional
         where to save the downloaded zip atchive containing the images, by default "dataset/raw/images.zip"
     force_override : bool, optional
-        flag to force setup of dataset from the start, by default False
+        flag to force generation of dataset from the start, by default False
     preprocess_tweets : bool, optional
         flag to decide application of tweet preprocessing, by default True
     build_label_matrix : bool, optional
         flag to also add labels as a list of lists, by default True
+    drop_something_else : bool, optional
+        flag to drop the label 'something else', and data points which only have no other labels, by default True
+    generate_captions : bool, optional
+        flag to decide if captions have to be generated, by default False
+    test_split : float, optional
+        size of test split, training set will be the remaining percentage, by default 0.2
+    seed : int, optional
+        seed for splitting the dataset in train and test set, by default None
 
     Returns
     -------
-    Dataset
-        the dataset with the selected labels loaded as a huggingface dataset
+    DatasetDict
+        dataset with the selected labels loaded as a huggingface dataset dictionary split in training and test set
 
     Raises
     ------
@@ -151,13 +181,18 @@ def load(mode="M", raw_dataset_path="./dataset/raw/MulTweEmo_raw.pkl", csv_path=
 
     # if the csv with the processed dataset does not exist yet, create it
     if not exists(csv_path) or force_override:
-        _create_csv(raw_dataset_path=raw_dataset_path, csv_path=csv_path, image_path=image_path)
+        _create_csv(raw_dataset_path=raw_dataset_path, csv_path=csv_path, image_path=image_path, generate_captions=generate_captions)
 
     dataset = load_dataset("csv", data_files=csv_path, split="train")
-    
+
+    if "caption" not in dataset.column_names and generate_captions:
+        _create_csv(raw_dataset_path=raw_dataset_path, csv_path=csv_path, image_path=image_path, generate_captions=generate_captions)
+
+
+
     # extract images from the zip file
-    # NOTE: currently it extracts every image, even those of the samples without gold labels
-    _extract_images(image_zip_path=image_zip_path, image_path=image_path)
+    if extract_images:
+        _extract_images(image_zip_path=image_zip_path, image_path=image_path, files_to_extract=dataset["img_name"])
 
     # drop the labels for the mode which was not selected    
     features = dataset.features
@@ -186,17 +221,27 @@ def load(mode="M", raw_dataset_path="./dataset/raw/MulTweEmo_raw.pkl", csv_path=
 
     # remove rows without a label
     id_list = []
-    global labels
+    labels = get_labels()
 
     for i, elem in enumerate(dataset):
     # iterate on labels, if one with a non zero value is found the row is kept
         for emotion in labels:
             if elem[emotion] != 0:
-                id_list.append(i)
-                break
+                if not drop_something_else:
+                    id_list.append(i)
+                    break
+                elif drop_something_else and emotion != "something else":
+                    id_list.append(i)
+                    break
+
     dataset = dataset.select(id_list)
 
-    return dataset
+    if drop_something_else:
+        dataset = dataset.remove_columns("something else")
+    
+    dataset = dataset.map(lambda x: {"img_path": f"{image_path}/{x}"}, input_columns="img_name", remove_columns="img_name")
+
+    return dataset.train_test_split(test_size=test_split, seed=seed, shuffle=True)
 
 # TODO potentially handle emoji, urls, mentions with substitution instead of removal
 def _preprocess_tweet(input: dict):
@@ -235,15 +280,14 @@ def _preprocess_tweet(input: dict):
     mention_pattern = re.compile("@[A-Za-z0–9_]+")
     tweet = re.sub(mention_pattern,"",tweet)
     
-    # remove occurrences of &amp;
-    and_pattern = re.compile("&amp;")
-    tweet = re.sub(and_pattern,"&",tweet)
-
+    # converts html character references to actual character, e.g. &amp; to &
+    tweet = html.unescape(tweet)
     input["tweet"] = tweet
+
     return input
 
 def _build_label_matrix(dataset):
-    global labels
+    labels = get_labels()
     label_matrix = []
     for elem in dataset:
         label_row = []
