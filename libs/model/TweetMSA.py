@@ -10,6 +10,7 @@ from io import BytesIO
 # TODO weight initialization
 
 class TweetMSA(PreTrainedModel):
+    config_class=TweetMSAConfig
     def __init__(self, config: TweetMSAConfig) -> None:
         super().__init__(config)
 
@@ -34,16 +35,13 @@ class TweetMSA(PreTrainedModel):
             self.fc_layers.append(layer)        
 
         output_layer = nn.Sequential()
-        output_layer.append(nn.Linear(512, 10))
+        output_layer.append(nn.Linear(512, 9))
         output_layer.append(nn.Sigmoid())
         self.fc_layers.append(output_layer)
 
         self.criterion = nn.BCELoss()
         
-        self.fc_layers.apply(self._init_weights)
-
-        self.to(self.device)
-    
+        self.fc_layers.apply(self._init_weights)    
     
     def _init_weights(self, m):
         if isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):

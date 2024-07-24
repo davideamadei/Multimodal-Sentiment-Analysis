@@ -9,7 +9,7 @@ class TweetMSAConfig(PretrainedConfig):
         self,
         feature_extractor: str ="jinaai/jina-clip-v1",
         feature_extractor_config: PretrainedConfig = None,
-        device: str = None,
+        # device: str = None,
         dropout_p: float = 0.2,
         n_layers: int = 1,
         **kwargs) -> None:
@@ -19,18 +19,18 @@ class TweetMSAConfig(PretrainedConfig):
       if n_layers < 0:
         raise ValueError("the number of layers must be a positive integer")
       
-      if device is None:
-        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-      elif device == "cpu":
-        self.device = torch.device("cpu")
-      elif device == "gpu":
-        if torch.cuda.is_available():
-          self.device = torch.device("cuda:0")
-        else:
-          print("A cuda device is not available, the model will be initialized on CPU")
-          self.device = torch.device("cpu")
-      else:
-        raise ValueError("cpu and gpu are the only values accepted")
+      # if device is None:
+      #   self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+      # elif device == "cpu":
+      #   self.device = torch.device("cpu")
+      # elif device == "gpu":
+      #   if torch.cuda.is_available():
+      #     self.device = torch.device("cuda:0")
+      #   else:
+      #     print("A cuda device is not available, the model will be initialized on CPU")
+      #     self.device = torch.device("cpu")
+      # else:
+      #   raise ValueError("cpu and gpu are the only values accepted")
       
       if dropout_p > 1 or dropout_p < 0:
         raise ValueError("dropout rate must be between 0 and 1")

@@ -218,12 +218,15 @@ def load(mode="M", raw_dataset_path="./dataset/raw/MulTweEmo_raw.pkl", csv_path=
     if preprocess_tweets:
         dataset = dataset.map(_preprocess_tweet)
 
-    if build_label_matrix:
-        dataset = dataset.add_column("labels", _build_label_matrix(dataset))
-
     # remove rows without a label
     id_list = []
     labels = get_labels()
+
+    if drop_something_else:
+        labels.remove("something else")
+
+    if build_label_matrix:
+        dataset = dataset.add_column("labels", _build_label_matrix(dataset, labels))
 
     for i, elem in enumerate(dataset):
     # iterate on labels, if one with a non zero value is found the row is kept
@@ -288,8 +291,7 @@ def _preprocess_tweet(input: dict):
 
     return input
 
-def _build_label_matrix(dataset):
-    labels = get_labels()
+def _build_label_matrix(dataset, labels):
     label_matrix = []
     for elem in dataset:
         label_row = []
