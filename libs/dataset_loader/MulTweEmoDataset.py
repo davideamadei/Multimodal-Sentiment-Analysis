@@ -236,6 +236,7 @@ def load(mode="M", raw_dataset_path="./dataset/raw/MulTweEmo_raw.pkl", csv_path=
     if build_label_matrix:
         dataset = dataset.add_column("labels", _build_label_matrix(dataset, labels))
 
+    # TODO maybe not necessary
     for i, elem in enumerate(dataset):
     # iterate on labels, if one with a non zero value is found the row is kept
         for emotion in labels:
