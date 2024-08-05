@@ -1,6 +1,6 @@
 from .TweetMSAConfig import TweetMSAConfig
 from transformers import PreTrainedModel, AutoModel, AutoProcessor, PretrainedConfig
-from torch import nn, concatenate
+from torch import nn, concatenate, where
 import torch.nn.functional as F
 from PIL import Image
 import requests
@@ -22,25 +22,26 @@ class TweetMSA(PreTrainedModel):
         self.fc_layers = nn.ModuleList()
 
         input_layer = nn.Sequential()
-        input_layer.append(nn.Linear(self.feature_extractor.config.projection_dim*2, 512))
+        input_layer.append(nn.Linear(self.feature_extractor.config.projection_dim*2, config.units_per_layer))
         input_layer.append(nn.Dropout(config.dropout_p))
         input_layer.append(nn.LeakyReLU())
         self.fc_layers.append(input_layer)
         
         for i in range(config.n_layers):
             layer = nn.Sequential()
-            layer.append(nn.Linear(512, 512))
+            layer.append(nn.Linear(config.units_per_layer, config.units_per_layer))
             layer.append(nn.Dropout(config.dropout_p))
             layer.append(nn.LeakyReLU())
             self.fc_layers.append(layer)        
 
         output_layer = nn.Sequential()
-        output_layer.append(nn.Linear(512, 9))
-        output_layer.append(nn.Sigmoid())
+        output_layer.append(nn.Linear(config.units_per_layer, 9))
         self.fc_layers.append(output_layer)
 
-        self.criterion = nn.BCELoss()
+        self.criterion = nn.BCEWithLogitsLoss()
         
+        self.sigmoid = nn.Sigmoid()
+
         self.fc_layers.apply(self._init_weights)    
     
     def _init_weights(self, m):
@@ -68,7 +69,7 @@ class TweetMSA(PreTrainedModel):
         processed_inputs = self.processor(
                                         text = dataset[text_column], 
                                         images = processed_images, 
-                                        padding=True, return_tensors="pt", truncation=True
+                                        padding=True, truncation=True, return_tensors="pt"
                                         )
 
         dataset = dataset.add_column("input_ids", processed_inputs["input_ids"].tolist())
@@ -86,8 +87,13 @@ class TweetMSA(PreTrainedModel):
         for layer in self.fc_layers:
             logits = layer(logits)
 
+        outputs = self.sigmoid(logits)
+        
+        if self.config.label_threshold is not None:
+            outputs = where(outputs > self.config.label_threshold, 1, 0)
+
         if labels is not None :
             loss = self.criterion(logits, labels)
-            return {"loss": loss, "logits": logits}
+            return {"loss": loss, "output": outputs}
         
-        return logits
+        return outputs

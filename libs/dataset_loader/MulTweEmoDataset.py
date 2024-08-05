@@ -9,7 +9,7 @@ from transformers import BlipProcessor, BlipForConditionalGeneration
 from PIL import Image
 import torch
 import html
-
+import pathlib
 
 # a list of the possible labels for the dataset
 
@@ -34,6 +34,11 @@ def _download_raw(raw_dataset_path="./dataset/raw/MulTweEmo_raw.pkl", image_zip_
     image_url = f"https://drive.google.com/uc?id={image_id}"
     text_url = f"https://drive.google.com/uc?id={text_id}"
     
+    # create path if it does not exist
+    image_path = pathlib.Path(image_zip_path)
+    image_path.parent.mkdir(parents=True, exist_ok=True)
+    text_path = pathlib.Path(raw_dataset_path)
+    text_path.parent.mkdir(parents=True, exist_ok=True)
 
     gdown.download(image_url, image_zip_path, quiet=False, resume=True)
     gdown.download(text_url, raw_dataset_path, quiet=False, resume=True)
@@ -117,16 +122,18 @@ def _create_csv(raw_dataset_path="./dataset/raw/MulTweEmo_raw.pkl", csv_path="./
     dataset["img_name"] = dataset.apply(lambda x : f"{x['id']}_{x['img_name']}.jpg", axis=1)
     columns = ["id", "tweet", "img_name"] + labels
 
-    # TODO: change to proper model
     if generate_captions:
-        processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-base")
-        model = BlipForConditionalGeneration.from_pretrained("Salesforce/blip-image-captioning-base", torch_dtype=torch.float16).to("cuda")
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+
+        processor = BlipProcessor.from_pretrained("Salesforce/blip2-opt-2.7b")
+        model = BlipForConditionalGeneration.from_pretrained("Salesforce/blip2-opt-2.7b", load_in_8bit=True, device_map={"": 0}, torch_dtype=torch.float16)
 
         images = [Image.open(f"{image_path}/{x}").convert("RGB") for x in dataset["img_name"]]
-        processed_images = processor(images, return_tensors="pt").to("cuda", torch.float16)
+        processed_images = processor(images, return_tensors="pt").to(device, torch.float16)
 
         out = model.generate(**processed_images)
         captions = processor.batch_decode(out, skip_special_tokens=True)
+        captions = [caption.strip() for caption in captions]
 
         dataset["caption"] = captions
         columns = columns + ["caption"]
@@ -223,6 +230,7 @@ def load(mode="M", raw_dataset_path="./dataset/raw/MulTweEmo_raw.pkl", csv_path=
     labels = get_labels()
 
     if drop_something_else:
+        dataset = dataset.remove_columns("something else")
         labels.remove("something else")
 
     if build_label_matrix:
@@ -232,17 +240,11 @@ def load(mode="M", raw_dataset_path="./dataset/raw/MulTweEmo_raw.pkl", csv_path=
     # iterate on labels, if one with a non zero value is found the row is kept
         for emotion in labels:
             if elem[emotion] != 0:
-                if not drop_something_else:
-                    id_list.append(i)
-                    break
-                elif drop_something_else and emotion != "something else":
-                    id_list.append(i)
-                    break
+                id_list.append(i)
+                break
 
     dataset = dataset.select(id_list)
 
-    if drop_something_else:
-        dataset = dataset.remove_columns("something else")
     
     dataset = dataset.map(lambda x: {"img_path": f"{image_path}/{x}"}, input_columns="img_name", remove_columns="img_name")
 
