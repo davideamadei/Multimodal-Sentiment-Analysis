@@ -5,11 +5,13 @@ from pathlib import PurePath
 from datasets import load_dataset, DatasetDict
 from zipfile import ZipFile
 import re
-from transformers import BlipProcessor, BlipForConditionalGeneration
+from transformers import AutoProcessor, Blip2ForConditionalGeneration
 from PIL import Image
 import torch
 import html
 import pathlib
+
+# TODO fix jank with downloads and image extraction
 
 # a list of the possible labels for the dataset
 
@@ -18,7 +20,7 @@ def get_labels():
 
 # TODO could add a config for the paths
  
-def _download_raw(raw_dataset_path="./dataset/raw/MulTweEmo_raw.pkl", image_zip_path="dataset/raw/images.zip")->None:
+def _download_raw(raw_dataset_path="./dataset/raw/MulTweEmo_raw.pkl", image_zip_path="./dataset/raw/images.zip")->None:
     """utility function to download the raw dataset. If the files are already present they will not be downloaded again
 
     Parameters
@@ -44,7 +46,7 @@ def _download_raw(raw_dataset_path="./dataset/raw/MulTweEmo_raw.pkl", image_zip_
     gdown.download(text_url, raw_dataset_path, quiet=False, resume=True)
 
 
-def _extract_images(files_to_extract: list[str], image_zip_path="dataset/raw/images.zip", image_path="./dataset/images") -> None:
+def _extract_images(files_to_extract: list[str], image_zip_path="./dataset/raw/images.zip", image_path="./dataset/images") -> None:
     """utility function to extract images from the zip archive
 
     Parameters
@@ -98,7 +100,8 @@ def _prepare_dataset(raw_dataset_path="./dataset/raw/MulTweEmo_raw.pkl") -> pd.D
     return raw_dataset
     
 
-def _create_csv(raw_dataset_path="./dataset/raw/MulTweEmo_raw.pkl", csv_path="./dataset/MulTweEmo.csv", image_path="./dataset/images", generate_captions=False)->None:
+def _create_csv(raw_dataset_path="./dataset/raw/MulTweEmo_raw.pkl", csv_path="./dataset/MulTweEmo.csv", 
+                image_path="./dataset/images", image_zip_path="./dataset/raw/images.zip", generate_captions=False)->None:
     """utility function to save the csv file containing the processed dataset
 
     Parameters
@@ -123,10 +126,11 @@ def _create_csv(raw_dataset_path="./dataset/raw/MulTweEmo_raw.pkl", csv_path="./
     columns = ["id", "tweet", "img_name"] + labels
 
     if generate_captions:
+        _extract_images(image_zip_path=image_zip_path, image_path=image_path, files_to_extract=dataset["img_name"])
         device = "cuda" if torch.cuda.is_available() else "cpu"
 
-        processor = BlipProcessor.from_pretrained("Salesforce/blip2-opt-2.7b")
-        model = BlipForConditionalGeneration.from_pretrained("Salesforce/blip2-opt-2.7b", load_in_8bit=True, device_map={"": 0}, torch_dtype=torch.float16)
+        processor = AutoProcessor.from_pretrained("Salesforce/blip2-opt-2.7b")
+        model = Blip2ForConditionalGeneration.from_pretrained("Salesforce/blip2-opt-2.7b", load_in_8bit=True, device_map={"": 0}, torch_dtype=torch.float16)
 
         images = [Image.open(f"{image_path}/{x}").convert("RGB") for x in dataset["img_name"]]
         processed_images = processor(images, return_tensors="pt").to(device, torch.float16)
@@ -144,7 +148,7 @@ def _create_csv(raw_dataset_path="./dataset/raw/MulTweEmo_raw.pkl", csv_path="./
 
 
 def load(mode="M", raw_dataset_path="./dataset/raw/MulTweEmo_raw.pkl", csv_path="./dataset/MulTweEmo.csv", 
-        image_path="./dataset/images", image_zip_path="dataset/raw/images.zip",
+        image_path="./dataset/images", image_zip_path="./dataset/raw/images.zip",
         force_override=False, extract_images=True, preprocess_tweets=True, build_label_matrix=True, drop_something_else=True,
         generate_captions=False, test_split=0.2, seed:int=None)->DatasetDict:
         
@@ -190,7 +194,7 @@ def load(mode="M", raw_dataset_path="./dataset/raw/MulTweEmo_raw.pkl", csv_path=
 
     # if the csv with the processed dataset does not exist yet, create it
     if not exists(csv_path) or force_override:
-        _create_csv(raw_dataset_path=raw_dataset_path, csv_path=csv_path, image_path=image_path, generate_captions=generate_captions)
+        _create_csv(raw_dataset_path=raw_dataset_path, csv_path=csv_path, image_path=image_path, image_zip_path=image_zip_path, generate_captions=generate_captions)
 
     dataset = load_dataset("csv", data_files=csv_path, split="train")
 
