@@ -65,15 +65,14 @@ if __name__ == "__main__":
 							
 							eval_strategy="epoch", 
 							
-							logging_strategy="no",
-							logging_steps=1,
+							logging_steps=2,
 							
 							# necessary to save models
 							save_safetensors=False,
 							bf16=True,
 
 							num_train_epochs=10,
-							# warmup_steps=50,
+							warmup_steps=50,
 
 							# disable_tqdm=True,
 							# torch_compile=True,

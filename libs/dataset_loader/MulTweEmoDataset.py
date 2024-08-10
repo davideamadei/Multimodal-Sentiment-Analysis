@@ -126,7 +126,7 @@ def _create_csv(raw_dataset_path="./dataset/raw/MulTweEmo_raw.pkl", csv_path="./
     columns = ["id", "tweet", "img_name"] + labels
 
     if generate_captions:
-        _extract_images(image_zip_path=image_zip_path, image_path=image_path, files_to_extract=dataset["img_name"])
+        _extract_images(image_zip_path=image_zip_path, image_path=image_path, files_to_extract=dataset["img_name"].to_list())
         device = "cuda" if torch.cuda.is_available() else "cpu"
 
         processor = AutoProcessor.from_pretrained("Salesforce/blip2-opt-2.7b")
@@ -168,6 +168,8 @@ def load(mode="M", raw_dataset_path="./dataset/raw/MulTweEmo_raw.pkl", csv_path=
         where to save the downloaded zip atchive containing the images, by default "dataset/raw/images.zip"
     force_override : bool, optional
         flag to force generation of dataset from the start, by default False
+    extract_images : bool, optional
+        flag to extract images from archive, by default True
     preprocess_tweets : bool, optional
         flag to decide application of tweet preprocessing, by default True
     build_label_matrix : bool, optional
