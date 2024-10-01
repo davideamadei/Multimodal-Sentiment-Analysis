@@ -22,20 +22,20 @@ class TweetMSA(PreTrainedModel):
         self.fc_layers = nn.ModuleList()
 
         input_layer = nn.Sequential()
-        input_layer.append(nn.Linear(self.feature_extractor.config.projection_dim*2, config.units_per_layer))
+        input_layer.append(nn.Linear(self.feature_extractor.config.projection_dim*2, config.layers[0]))
         input_layer.append(nn.Dropout(config.dropout_p))
         input_layer.append(nn.LeakyReLU())
         self.fc_layers.append(input_layer)
         
-        for i in range(config.n_layers):
+        for i in range(len(config.layers)-1):
             layer = nn.Sequential()
-            layer.append(nn.Linear(config.units_per_layer, config.units_per_layer))
+            layer.append(nn.Linear(config.layers[i], config.layers[i+1]))
             layer.append(nn.Dropout(config.dropout_p))
             layer.append(nn.LeakyReLU())
             self.fc_layers.append(layer)        
 
         output_layer = nn.Sequential()
-        output_layer.append(nn.Linear(config.units_per_layer, 9))
+        output_layer.append(nn.Linear(config.layers[-1], 9))
         self.fc_layers.append(output_layer)
 
         self.criterion = nn.BCEWithLogitsLoss()

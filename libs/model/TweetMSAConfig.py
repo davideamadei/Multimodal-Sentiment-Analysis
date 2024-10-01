@@ -1,7 +1,7 @@
 from transformers import PretrainedConfig
 import torch
 
-
+# TODO: change how nn structure is passed
 class TweetMSAConfig(PretrainedConfig):
     model_type = "multimodal-sentiment-analysis"
 
@@ -11,15 +11,14 @@ class TweetMSAConfig(PretrainedConfig):
         feature_extractor_config: PretrainedConfig = None,
         # device: str = None,
         dropout_p: float = 0.2,
-        n_layers: int = 1,
-        units_per_layer = 512,
+        layers: tuple[int] = (512,512),
         weight_initialization = "xavier_normal",
         label_threshold = None,
         **kwargs) -> None:
       
       if feature_extractor not in ["jinaai/jina-clip-v1", "openai/clip-vit-base-patch32", "openai/clip-vit-large-patch14"]:
         raise ValueError("Only the following models are accepted:\n" + "\n".join(["jinaai/jina-clip-v1", "openai/clip-vit-base-patch32", "openai/clip-vit-large-patch14"]))
-      if n_layers < 0:
+      if len(layers) <= 0:
         raise ValueError("the number of layers must be a positive integer")
       
       # if device is None:
@@ -43,8 +42,7 @@ class TweetMSAConfig(PretrainedConfig):
 
       self.dropout_p = dropout_p
 
-      self.n_layers = n_layers
-      self.units_per_layer = units_per_layer
+      self.layers = layers
 
       self.weight_initialization = weight_initialization
 
