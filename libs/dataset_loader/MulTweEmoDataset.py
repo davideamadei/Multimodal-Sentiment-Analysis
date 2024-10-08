@@ -10,6 +10,7 @@ from PIL import Image
 import torch
 import html
 import pathlib
+from sklearn.model_selection import train_test_split
 
 # a list of the possible labels for the dataset
 
@@ -33,6 +34,7 @@ def _download_dataset(raw_dataset_path="./dataset/raw/MulTweEmo_raw.pkl", image_
     create_dataset : bool, optional
         if True the dataset is created from scratch using the raw data, controls wether the raw dataset or the processed dataset is downloaded, by default False
     """
+    # download images archive
     image_id = "1gfce4Ko3GsE4eJ2ILtr5swQoRXMRyFpS"
     image_url = f"https://drive.google.com/uc?id={image_id}"
     # create path if it does not exist
@@ -41,7 +43,10 @@ def _download_dataset(raw_dataset_path="./dataset/raw/MulTweEmo_raw.pkl", image_
 
     gdown.download(image_url, image_zip_path, quiet=False, resume=True)
     
+    # decide which files to download, depending on if the dataset is being built from scratch or not
     if create_dataset:
+
+        # download raw dataset pkl
         text_id = "1x5zOBcS2ktknP_lDTdLfMYMzMAqc_xMU"
         text_url = f"https://drive.google.com/uc?id={text_id}"
         # create path if it does not exist
@@ -49,6 +54,8 @@ def _download_dataset(raw_dataset_path="./dataset/raw/MulTweEmo_raw.pkl", image_
         text_path.parent.mkdir(parents=True, exist_ok=True)
         gdown.download(text_url, raw_dataset_path, quiet=False, resume=True)
     else:
+
+        # download processed dataset csv
         dataset_id = "10Yc4pFlVVPGGFHNblJe9ApA5n1sk8j14"
         dataset_url = f"https://drive.google.com/uc?id={dataset_id}"
         # create path if it does not exist
@@ -153,8 +160,8 @@ def _create_csv(raw_dataset_path="./dataset/raw/MulTweEmo_raw.pkl", csv_path="./
 
 def load(mode:str="M", raw_dataset_path:str="./dataset/raw/MulTweEmo_raw.pkl", csv_path:str="./dataset/MulTweEmo.csv", 
         image_path:str="./dataset/images", image_zip_path:str="./dataset/raw/images.zip",
-        force_override=False, extract_images=True, preprocess_tweets=True, build_label_matrix=True, drop_something_else=True,
-        create_dataset=False, test_split:float=0.2, seed:int=None)->DatasetDict:
+        force_override=False, preprocess_tweets=True, build_label_matrix=True, drop_something_else=True,
+        create_dataset=False, test_split:float=0.2, seed:int=None)->tuple[pd.DataFrame]:
         
     """function to load the MulTweEmo dataset, downloads dataset if not cached. The processed dataset for further uses is also saved as a csv
 
@@ -172,8 +179,6 @@ def load(mode:str="M", raw_dataset_path:str="./dataset/raw/MulTweEmo_raw.pkl", c
         where to save the downloaded zip atchive containing the images, by default "dataset/raw/images.zip"
     force_override : bool, optional
         flag to overwrite the dataset, by default False
-    extract_images : bool, optional
-        flag to extract images from archive, by default True
     preprocess_tweets : bool, optional
         flag to decide application of tweet preprocessing, by default True
     build_label_matrix : bool, optional
@@ -183,24 +188,29 @@ def load(mode:str="M", raw_dataset_path:str="./dataset/raw/MulTweEmo_raw.pkl", c
     create_dataset : bool, optional
         if True the dataset is created from scratch using the raw data, by default False
     test_split : float, optional
-        size of test split, training set will be the remaining percentage, by default 0.2
+        size of test split, training set will be the remaining percentage. If set to None test size will be empty by default 0.2
     seed : int, optional
         seed for splitting the dataset in train and test set, by default None
 
     Returns
     -------
-    DatasetDict
-        dataset with the selected labels loaded as a huggingface dataset dictionary split in training and test set
+    tuple[pd.DataFrame]
+        tuple containig two pandas dataframes, one with training set and one with test set. If test_split is None the test set will be None
 
     Raises
     ------
     ValueError
         if mode has a value which is neither "M" or "T"
     """
+    
+    if test_split is not None and (test_split < 0 or test_split > 1):
+        raise ValueError("train_test_split must be between 0 and 1")
 
+    # download archive with images in dataset
     if not exists(image_zip_path):
         _download_dataset(raw_dataset_path=raw_dataset_path, image_zip_path=image_zip_path, csv_path=csv_path, create_dataset=create_dataset)
 
+    # create dataset from raw data or download already processed dataset
     if create_dataset:
         if not exists(raw_dataset_path) or force_override:
             _download_dataset(raw_dataset_path=raw_dataset_path, image_zip_path=image_zip_path, csv_path=csv_path, create_dataset=create_dataset)
@@ -209,59 +219,63 @@ def load(mode:str="M", raw_dataset_path:str="./dataset/raw/MulTweEmo_raw.pkl", c
         if not exists(csv_path):
             _download_dataset(raw_dataset_path=raw_dataset_path, image_zip_path=image_zip_path, csv_path=csv_path, create_dataset=create_dataset)
 
-    dataset = load_dataset("csv", data_files=csv_path, split="train")
+    dataset = pd.read_csv(csv_path)
 
     # extract images from the zip file
-    # if extract_images:
+    # skips already existing files
     _extract_images(image_zip_path=image_zip_path, image_path=image_path, files_to_extract=dataset["img_name"])
 
     # drop the labels for the mode which was not selected    
-    features = dataset.features
+    features = dataset.columns.to_list()
     if mode=="M":
         dropped_features = [x for x in features if x.startswith("T_")]
     elif mode=="T":
         dropped_features = [x for x in features if x.startswith("M_")]
     else:
         raise ValueError("The only modes accepted are M for multimodal labels and T for text only labels.")
-    
-    dataset = dataset.remove_columns(dropped_features)
+    dataset = dataset.drop(columns=dropped_features)
 
     # rename labels
     rename_map = {}
     features_to_rename = [x for x in features if x.startswith(f"{mode}_")]
     for feature in features_to_rename:
         rename_map[feature] = feature[2:].lower()
-    dataset = dataset.rename_columns(rename_map)
+        
+    dataset = dataset.rename(columns=rename_map)
 
     # preprocess tweets if necessary
     if preprocess_tweets:
-        dataset = dataset.map(_preprocess_tweet)
+        dataset = dataset.apply(_preprocess_tweet, axis=1)
 
     # remove rows without a label
     id_list = []
     labels = get_labels()
 
     if drop_something_else:
-        dataset = dataset.remove_columns("something else")
+        dataset = dataset.drop(columns=["something else"])
         labels.remove("something else")
 
     if build_label_matrix:
-        dataset = dataset.add_column("labels", _build_label_matrix(dataset, labels))
+        dataset.insert(2, "labels", _build_label_matrix(dataset, labels))
 
-    # TODO maybe not necessary
-    for i, elem in enumerate(dataset):
+    for i, row in dataset.iterrows():
     # iterate on labels, if one with a non zero value is found the row is kept
         for emotion in labels:
-            if elem[emotion] != 0:
+            if row[emotion] != 0:
                 id_list.append(i)
                 break
 
-    dataset = dataset.select(id_list)
+    dataset = dataset.loc[id_list].reset_index(drop=True)
 
     
-    dataset = dataset.map(lambda x: {"img_path": f"{image_path}/{x}"}, input_columns="img_name", remove_columns="img_name")
+    dataset["img_name"] = dataset["img_name"].apply(lambda x: f"{image_path}/{x}")
+    dataset = dataset.rename(columns={"img_name":"img_path"})
 
-    return dataset.train_test_split(test_size=test_split, seed=seed, shuffle=True)
+    if test_split is not None:
+        return train_test_split(dataset, test_size=test_split, random_state=seed)
+
+    return (dataset, None)
+    # return dataset.train_test_split(test_size=test_split, seed=seed, shuffle=True)
 
 # TODO potentially handle emoji, urls, mentions with substitution instead of removal
 def _preprocess_tweet(input: dict):
@@ -308,10 +322,10 @@ def _preprocess_tweet(input: dict):
 
 def _build_label_matrix(dataset, labels):
     label_matrix = []
-    for elem in dataset:
+    for i, row in dataset.iterrows():
         label_row = []
         for label in labels:
-            label_row.append(float(elem[label]))
+            label_row.append(float(row[label]))
         label_matrix.append(label_row)
     return label_matrix
 
