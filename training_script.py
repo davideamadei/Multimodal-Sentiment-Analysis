@@ -30,11 +30,11 @@ if __name__ == "__main__":
 	args = parser.parse_args()
 
 	clip = args.clip_version
-      
+    
 	if clip == "base":
-		clip_model = "openai/clip-vit-base-patch32"
+		clip_model = "clip_base"
 	elif clip == "jina":	
-		clip_model = "jinaai/jina-clip-v1"
+		clip_model = "jina"
 
 	report = "wandb"
 	if args.no_report:
@@ -45,14 +45,14 @@ if __name__ == "__main__":
 
 	config = TweetMSAConfig(feature_extractor=clip_model, n_layers=2)
 	model = TweetMSA(config).cuda()
-	dataset = MulTweEmoDataset.load(seed=123, generate_captions=False)["train"].train_test_split(test_size=0.25, seed=123)
-	val_dataset = dataset["test"].select(range(10))
-	dataset = dataset["train"].select(range(10))
+	dataset = MulTweEmoDataset.load(seed=123)
+	val_dataset = dataset.head(10)
+	dataset = dataset.tail(10)
 	print("Processing dataset")
-	dataset =  model.preprocess_dataset(dataset=dataset)
-	val_dataset = model.preprocess_dataset(dataset=val_dataset)
+	dataset =  TweetMSA.preprocess_dataset(dataset=dataset, model=clip_model, label_column="labels")
+	val_dataset = TweetMSA.preprocess_dataset(dataset=val_dataset, model=clip_model, label_column="labels")
 	print("Done!")
-	
+	print(Dataset.from_pandas(dataset))
 	args = TrainingArguments(
 							report_to="none",
 							run_name=f"{clip}_clip",
@@ -60,7 +60,7 @@ if __name__ == "__main__":
 							per_device_train_batch_size=16, 
 							resume_from_checkpoint=True,
 							save_total_limit=5,
-							save_strategy="epoch", 
+							save_strategy="no", 
 							output_dir=f"./.ckp/{clip}", 
 							
 							eval_strategy="epoch", 
@@ -71,19 +71,19 @@ if __name__ == "__main__":
 							save_safetensors=False,
 							bf16=True,
 
-							num_train_epochs=10,
-							warmup_steps=50,
+							num_train_epochs=2,
+							warmup_steps=0,
 
 							# disable_tqdm=True,
 							# torch_compile=True,
 							push_to_hub=False,
-							load_best_model_at_end=True,
+							load_best_model_at_end=False,
 							)
 
 	trainer = Trainer(
 					model=model,
-					train_dataset=dataset,
-					eval_dataset=val_dataset,
+					train_dataset=Dataset.from_pandas(dataset),
+					eval_dataset=Dataset.from_pandas(val_dataset),
 					args=args,
 					tokenizer=None,
 					compute_metrics=compute_metrics,
@@ -101,4 +101,4 @@ if __name__ == "__main__":
 	print(compute_metrics((val_results.predictions, val_dataset["labels"])))
 
 	print(skm.classification_report(val_dataset["labels"], val_results.predictions > 0.5))
-      
+		

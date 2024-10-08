@@ -9,18 +9,6 @@ import argparse
 import pickle
 
 
-
-def compute_metrics(eval_pred):
-    y_pred, y_true = eval_pred
-    y_pred = y_pred > 0.5
-    metrics_dict = {}
-
-    metrics_dict["exact_match"] = skm.accuracy_score(y_true, y_pred, normalize=True, sample_weight=None)
-    metrics_dict["recall"] = skm.recall_score(y_true=y_true, y_pred=y_pred, average='samples', zero_division=0)
-    metrics_dict["precision"] = skm.precision_score(y_true=y_true, y_pred=y_pred, average='samples', zero_division=0)
-    metrics_dict["f1_score"] = skm.f1_score(y_true=y_true, y_pred=y_pred, average='samples', zero_division=0)
-    return metrics_dict
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         prog='train_msa',
