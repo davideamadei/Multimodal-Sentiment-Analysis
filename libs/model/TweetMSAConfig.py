@@ -9,37 +9,22 @@ class TweetMSAConfig(PretrainedConfig):
         self,
         feature_extractor: str ="jina",
         feature_extractor_config: PretrainedConfig = None,
-        # device: str = None,
         dropout_p: float = 0.2,
-        layers: tuple[int] = (512,512),
+        n_layers: int = 2,
+        n_units:int = 512,
         weight_initialization:str = "xavier_normal",
-        label_threshold:float = None,
         **kwargs) -> None:
       
       # TODO: clip_large is currently not working
       if feature_extractor not in ["jina", "clip_base", "clip_large"]:
         raise ValueError("Only the following models are accepted for feature extraction:\n" + "\n".join(["jina", "clip_base", "clip_large"]))
-      if len(layers) <= 0:
+      if n_layers <= 0:
         raise ValueError("The number of layers must be a positive integer")
-      
-      # if device is None:
-      #   self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-      # elif device == "cpu":
-      #   self.device = torch.device("cpu")
-      # elif device == "gpu":
-      #   if torch.cuda.is_available():
-      #     self.device = torch.device("cuda:0")
-      #   else:
-      #     print("A cuda device is not available, the model will be initialized on CPU")
-      #     self.device = torch.device("cpu")
-      # else:
-      #   raise ValueError("cpu and gpu are the only values accepted")
+      if n_units <= 0:
+        raise ValueError("The number of units must be a positive integer")
       
       if dropout_p > 1 or dropout_p < 0:
         raise ValueError("Dropout rate must be between 0 and 1")
-      
-      if label_threshold is not None and (label_threshold > 1 or label_threshold < 0):
-        raise ValueError("Threshold for labels must be between 0 and 1")
 
 
       self.feature_extractor_name = TweetMSAConfig.get_feature_extractor_name_map()[feature_extractor]
@@ -47,11 +32,10 @@ class TweetMSAConfig(PretrainedConfig):
 
       self.dropout_p = dropout_p
 
-      self.layers = layers
+      self.n_layers = n_layers
+      self.n_units = n_units
 
       self.weight_initialization = weight_initialization
-
-      self.label_threshold = label_threshold
 
       super().__init__(**kwargs)
 

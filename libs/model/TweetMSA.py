@@ -22,20 +22,20 @@ class TweetMSA(PreTrainedModel):
         self.fc_layers = nn.ModuleList()
 
         input_layer = nn.Sequential()
-        input_layer.append(nn.Linear(self.feature_extractor.config.projection_dim*2, config.layers[0]))
+        input_layer.append(nn.Linear(self.feature_extractor.config.projection_dim*2, config.n_units))
         input_layer.append(nn.Dropout(config.dropout_p))
         input_layer.append(nn.LeakyReLU())
         self.fc_layers.append(input_layer)
         
-        for i in range(len(config.layers)-1):
+        for i in range(config.n_layers-1):
             layer = nn.Sequential()
-            layer.append(nn.Linear(config.layers[i], config.layers[i+1]))
+            layer.append(nn.Linear(config.n_units, config.n_units))
             layer.append(nn.Dropout(config.dropout_p))
             layer.append(nn.LeakyReLU())
             self.fc_layers.append(layer)        
 
         output_layer = nn.Sequential()
-        output_layer.append(nn.Linear(config.layers[-1], 9))
+        output_layer.append(nn.Linear(config.n_units, 9))
         self.fc_layers.append(output_layer)
 
         self.criterion = nn.BCEWithLogitsLoss()
@@ -59,9 +59,6 @@ class TweetMSA(PreTrainedModel):
             logits = layer(logits)
 
         outputs = self.sigmoid(logits)
-        
-        if self.config.label_threshold is not None:
-            outputs = where(outputs > self.config.label_threshold, 1, 0)
 
         if labels is not None :
             loss = self.criterion(logits, labels)

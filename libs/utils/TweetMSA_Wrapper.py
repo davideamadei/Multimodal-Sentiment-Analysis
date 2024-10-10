@@ -11,13 +11,16 @@ from datasets import Dataset
 #TODO: documentation
 class TweetMSA_Wrapper(BaseEstimator):
 
-    def __init__(self, learning_rate:float=1e-5, batch_size:int=16, n_epochs:int=10, layers:tuple[int]=(512, 512), 
+    def __init__(self, learning_rate:float=1e-5, batch_size:int=16, n_epochs:int=10,
+                 n_layers:int=2, n_units:int=512, dropout:float=0.2, 
                  warmup_steps:int=100, clip_version:str="jina", freeze_weights=False):
         super().__init__()
         self.learning_rate = learning_rate
         self.batch_size = batch_size
         self.n_epochs = n_epochs
-        self.layers = layers
+        self.n_layers = n_layers
+        self.n_units = n_units
+        self.dropout = dropout
         self.warmup_steps = warmup_steps
         self.clip_version = clip_version
         self.freeze_weights = freeze_weights
@@ -50,10 +53,10 @@ class TweetMSA_Wrapper(BaseEstimator):
 
     def predict(self, X):
         check_is_fitted(self)
-        return self._trainer.predict(Dataset.from_pandas(X))
+        return self._trainer.predict(X)
 
     def _create_model(self, X):
-        config = TweetMSAConfig(feature_extractor=self.clip_version, layers=self.layers)
+        config = TweetMSAConfig(feature_extractor=self.clip_version, layers=self.n_layers, n_units=self.n_units, dropout_p=self.dropout)
         model = TweetMSA(config).cuda()
 
         args = TrainingArguments(
@@ -80,10 +83,8 @@ class TweetMSA_Wrapper(BaseEstimator):
 
         trainer = Trainer(
             model=model,
-            train_dataset=Dataset.from_pandas(X),
+            train_dataset=X,
             args=args,
             tokenizer=None,
-            # compute_metrics=compute_metrics,
-        
             )
         self._trainer = trainer

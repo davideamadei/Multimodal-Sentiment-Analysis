@@ -1,3 +1,3 @@
-from .Estimator_wrapper import *
+from .TweetMSA_Wrapper import *
 
 __all__ = ["TweetMSA_Wrapper"]
