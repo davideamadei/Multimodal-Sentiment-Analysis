@@ -6,14 +6,14 @@ from torch import manual_seed
 import optuna
 import argparse
 from sklearn.model_selection import KFold
-        
+import sklearn.metrics as skm    
 
 class CVObjective(object):
     def __init__(self, clip_version="jina", append_captions:bool=False, freeze_weights:bool=False, cv_folds:int=4, seed:int=123):
         self.cv_folds = KFold(cv_folds, shuffle=True, random_state=seed)
         self.dataset, _ = MulTweEmoDataset.load(csv_path="./dataset/train_MulTweEmo.csv", mode="M", drop_something_else=True, test_split=None)
         if append_captions:
-            self.dataset["tweet"] = self.dataset.apply(lambda x: x["tweet"] + x["caption"], axis=1)
+            self.dataset["tweet"] = self.dataset.apply(lambda x: x["tweet"] + " " +  x["caption"], axis=1)
 
         self.dataset = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=self.dataset, model=clip_version, text_column="tweet", label_column="labels"))
         self.clip_version = clip_version
@@ -32,11 +32,11 @@ class CVObjective(object):
         for i, (train_index, val_index) in enumerate(self.cv_folds.split(self.dataset)):
             train = self.dataset.select(train_index)
             val = self.dataset.select(val_index)
-            model = TweetMSA_Wrapper(n_epochs=1, warmup_steps=warmup_steps, learning_rate=learning_rate, 
+            model = TweetMSA_Wrapper(n_epochs=n_epochs, warmup_steps=warmup_steps, learning_rate=learning_rate, 
                                  batch_size=batch_size, n_layers=n_layers, n_units=n_units,
                                  dropout=dropout, clip_version=self.clip_version, freeze_weights=self.freeze_weights)
             model.fit(train, train["labels"])
-            fold_results =  model.score(val, val["labels"])
+            _, fold_results =  model.score(val, val["labels"])
             for key in metrics_keys:
                 results[key] = results[key] + fold_results[key]
             del model
@@ -45,12 +45,12 @@ class CVObjective(object):
     
 
 class NormalObjective(object):
-    def __init__(self, clip_version="jina", append_captions:bool=False, freeze_weights:bool=False):
-        self.train, self.val = MulTweEmoDataset.load(csv_path="./dataset/train_MulTweEmo.csv", mode="M", drop_something_else=True, test_split=0.25)
+    def __init__(self, clip_version="jina", append_captions:bool=False, freeze_weights:bool=False, seed:int=123):
+        self.train, self.val = MulTweEmoDataset.load(csv_path="./dataset/train_MulTweEmo.csv", mode="M", drop_something_else=True, test_split=0.25, seed=seed)
 
         if append_captions:
-            self.train["tweet"] = self.train.apply(lambda x: x["tweet"] + x["caption"], axis=1)
-            self.val["tweet"] = self.val.apply(lambda x: x["tweet"] + x["caption"], axis=1)
+            self.train["tweet"] = self.train.apply(lambda x: x["tweet"] + " " + x["caption"], axis=1)
+            self.val["tweet"] = self.val.apply(lambda x: x["tweet"] + " "  + x["caption"], axis=1)
 
         self.train = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=self.train, model=clip_version, text_column="tweet", label_column="labels"))
         self.val = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=self.val, model=clip_version, text_column="tweet", label_column="labels"))
@@ -65,11 +65,22 @@ class NormalObjective(object):
         n_layers = trial.suggest_int("n_layers", 1, 10)
         n_units = trial.suggest_int("n_units", 32, 1024, log=True)
         dropout = trial.suggest_float("dropout", 0.0, 1.0)
-        model = TweetMSA_Wrapper(n_epochs=1, warmup_steps=warmup_steps, learning_rate=learning_rate, 
+        model = TweetMSA_Wrapper(n_epochs=n_epochs, warmup_steps=warmup_steps, learning_rate=learning_rate, 
                                  batch_size=batch_size, n_layers=n_layers, n_units=n_units,
                                  dropout=dropout, clip_version=self.clip_version, freeze_weights=self.freeze_weights)
         model.fit(self.train, self.train["labels"])
-        results =  model.score(self.val, self.val["labels"])
+        predictions, results =  model.score(self.val, self.val["labels"])
+        label_names = MulTweEmoDataset.get_labels()
+        label_names.remove("something else")
+        metrics = skm.classification_report(self.val["labels"], predictions, output_dict=True, zero_division=0, target_names=label_names)
+        for key, value in metrics.items():
+            trial.set_user_attr(key, value)
+        count = 0
+        for sample in predictions:
+            if 1 not in sample:
+                count+=1
+        print(predictions)
+        trial.set_user_attr("no_prediction_samples", count)
         del model
         return results["loss"], results["f1_score"], results["exact_match"]
 
@@ -97,7 +108,7 @@ if __name__ == "__main__":
     else:
         raise ValueError("clip model is invalid, use help to see suported versions")
     manual_seed(123)
-    objective = CVObjective(clip_version=clip_model, append_captions=args.append_captions, freeze_weights=args.freeze_weights)
+    objective = NormalObjective(clip_version=clip_model, append_captions=args.append_captions, freeze_weights=args.freeze_weights, seed=123)
 
     study_name = f"{clip_model}"  # Unique identifier of the study.
     if args.append_captions: study_name += "_append-captions"

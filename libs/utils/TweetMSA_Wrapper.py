@@ -49,7 +49,7 @@ class TweetMSA_Wrapper(BaseEstimator):
         metrics_dict["recall"] = skm.recall_score(y_true=y, y_pred=y_pred, average='samples', zero_division=0)
         metrics_dict["precision"] = skm.precision_score(y_true=y, y_pred=y_pred, average='samples', zero_division=0)
         metrics_dict["f1_score"] = skm.f1_score(y_true=y, y_pred=y_pred, average='samples', zero_division=0)
-        return metrics_dict
+        return y_pred, metrics_dict
 
     def predict(self, X):
         check_is_fitted(self)
@@ -58,7 +58,9 @@ class TweetMSA_Wrapper(BaseEstimator):
     def _create_model(self, X):
         config = TweetMSAConfig(feature_extractor=self.clip_version, layers=self.n_layers, n_units=self.n_units, dropout_p=self.dropout)
         model = TweetMSA(config).cuda()
-
+        if self.freeze_weights:
+            for param in model.feature_extractor.parameters():
+                param.requires_grad = False
         args = TrainingArguments(
                 report_to="none",
                 save_strategy="no", 
