@@ -79,7 +79,6 @@ class NormalObjective(object):
         for sample in predictions:
             if 1 not in sample:
                 count+=1
-        print(predictions)
         trial.set_user_attr("no_prediction_samples", count)
         del model
         return results["loss"], results["f1_score"], results["exact_match"]
