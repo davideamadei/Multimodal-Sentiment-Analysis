@@ -58,7 +58,7 @@ class NormalObjective(object):
         self.freeze_weights = freeze_weights
 
     def __call__(self, trial):
-        n_epochs = trial.suggest_int("n_epochs", 2, 10)
+        n_epochs = trial.suggest_int("n_epochs", 2, 15, logs=True)
         learning_rate = trial.suggest_float("learning_rate", 1e-5, 1e-2, log=True)
         warmup_steps = trial.suggest_int("warmup_steps", 0, 200, step=10)
         batch_size = trial.suggest_categorical("batch_size", [8,16,32])

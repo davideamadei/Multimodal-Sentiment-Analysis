@@ -71,7 +71,7 @@ class TweetMSA(PreTrainedModel):
         if model not in ["jina", "clip_base", "clip_large"]:
             raise ValueError("Only the following models are accepted:\n" + "\n".join(["jina", "clip_base", "clip_large"]))
         
-        processor = AutoProcessor.from_pretrained(TweetMSAConfig.get_feature_extractor_name_map()[model], trust_remote_code=True)
+        processor = AutoProcessor.from_pretrained(TweetMSAConfig.get_feature_extractor_name()[model], trust_remote_code=True)
 
         processed_images= []
         for img in dataset[image_column]:

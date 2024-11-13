@@ -27,7 +27,7 @@ class TweetMSAConfig(PretrainedConfig):
         raise ValueError("Dropout rate must be between 0 and 1")
 
 
-      self.feature_extractor_name = TweetMSAConfig.get_feature_extractor_name_map()[feature_extractor]
+      self.feature_extractor_name = TweetMSAConfig.get_feature_extractor_name(feature_extractor)
       self.feature_extractor_config = feature_extractor_config
 
       self.dropout_p = dropout_p
@@ -40,5 +40,5 @@ class TweetMSAConfig(PretrainedConfig):
       super().__init__(**kwargs)
 
     @staticmethod
-    def get_feature_extractor_name_map():
-      return {"jina" : "jinaai/jina-clip-v1", "clip_base" : "openai/clip-vit-base-patch32", "clip_large" : "openai/clip-vit-large-patch14"}
+    def get_feature_extractor_name(feature_extractor):
+      return {"jina" : "jinaai/jina-clip-v1", "clip_base" : "openai/clip-vit-base-patch32", "clip_large" : "openai/clip-vit-large-patch14"}[feature_extractor]
