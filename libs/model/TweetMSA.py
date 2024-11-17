@@ -1,11 +1,11 @@
 from .TweetMSAConfig import TweetMSAConfig
-from transformers import PreTrainedModel, AutoModel, AutoProcessor
+from transformers import PreTrainedModel, AutoModel, AutoProcessor, Blip2ForImageTextRetrieval
 from torch import nn, concatenate, where
 import pandas as pd
 from PIL import Image
 import requests
 from io import BytesIO
-
+import torch
 
 # TODO weight initialization
 
@@ -13,16 +13,22 @@ class TweetMSA(PreTrainedModel):
     config_class=TweetMSAConfig
     def __init__(self, config: TweetMSAConfig) -> None:
         super().__init__(config)
-        
+        self.config=config
         # the processor of the feature extractor is loaded but is not actually used, it is only present for external access
         self.processor = AutoProcessor.from_pretrained(config.feature_extractor_name, trust_remote_code=True)
-        
-        self.feature_extractor = AutoModel.from_pretrained(config.feature_extractor_name, trust_remote_code=True)
+        if self.config.feature_extractor_name_simple != "blip2":
+            self.feature_extractor = AutoModel.from_pretrained(config.feature_extractor_name, trust_remote_code=True)
+        else:
+            self.feature_extractor = Blip2ForImageTextRetrieval.from_pretrained(
+                TweetMSAConfig.get_feature_extractor_name(self.config.feature_extractor_name_simple))
 
         self.fc_layers = nn.ModuleList()
 
         input_layer = nn.Sequential()
-        input_layer.append(nn.Linear(self.feature_extractor.config.projection_dim*2, config.n_units))
+        if self.config.feature_extractor_name_simple != "blip2":
+            input_layer.append(nn.Linear(self.feature_extractor.config.projection_dim*2, config.n_units))
+        else:
+            input_layer.append(nn.Linear(256*2, config.n_units))
         input_layer.append(nn.Dropout(config.dropout_p))
         input_layer.append(nn.LeakyReLU())
         self.fc_layers.append(input_layer)
@@ -50,9 +56,14 @@ class TweetMSA(PreTrainedModel):
             m.bias.data.fill_(0.01)
 
     def forward(self, input_ids, attention_mask, pixel_values, labels=None):
-        text_embedding = self.feature_extractor.get_text_features(input_ids=input_ids, attention_mask=attention_mask)
-        image_embedding = self.feature_extractor.get_image_features(pixel_values=pixel_values)
-
+        if self.config.feature_extractor_name_simple != "blip2":
+            text_embedding = self.feature_extractor.get_text_features(input_ids=input_ids, attention_mask=attention_mask)
+            image_embedding = self.feature_extractor.get_image_features(pixel_values=pixel_values)
+        else:
+            itm_out = self.feature_extractor(input_ids=input_ids, attention_mask=attention_mask, 
+                                             pixel_values=pixel_values, use_image_text_matching_head=False, return_dict=True)
+            text_embedding = itm_out.text_embeds
+            image_embedding = itm_out.image_embeds[:,0,:]
         logits = concatenate((text_embedding, image_embedding), axis=-1)
 
         for layer in self.fc_layers:
@@ -68,10 +79,10 @@ class TweetMSA(PreTrainedModel):
 
     @staticmethod
     def preprocess_dataset(dataset, model="jina", text_column="tweet", image_column="img_path", label_column=None):
-        if model not in ["jina", "clip_base", "clip_large"]:
-            raise ValueError("Only the following models are accepted:\n" + "\n".join(["jina", "clip_base", "clip_large"]))
+        if model not in ["jina", "base", "large", "blip2"]:
+            raise ValueError("Only the following models are accepted:\n" + "\n".join(["jina", "base", "large", "blip2"]))
         
-        processor = AutoProcessor.from_pretrained(TweetMSAConfig.get_feature_extractor_name()[model], trust_remote_code=True)
+        processor = AutoProcessor.from_pretrained(TweetMSAConfig.get_feature_extractor_name(model), trust_remote_code=True)
 
         processed_images= []
         for img in dataset[image_column]:

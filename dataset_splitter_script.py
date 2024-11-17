@@ -32,7 +32,6 @@ if __name__ == "__main__":
     parser.add_argument("-t", "--train_path", type=str, default="./dataset/train_MulTweEmo.csv")
     parser.add_argument("-s", "--test_path", type=str, default="./dataset/test_MulTweEmo.csv")
     args = parser.parse_args()
-    
 
     dataset = pd.read_csv(args.dataset_path)
     train, test = train_test_split(dataset, test_size=args.test_size, random_state=args.seed)

@@ -15,8 +15,11 @@ from sklearn.model_selection import train_test_split
 
 # a list of the possible labels for the dataset
 
-def get_labels():
-    return ['anger', 'anticipation', 'disgust', 'fear', 'joy', 'neutral', 'sadness', 'something else', 'surprise', 'trust']
+def get_labels(drop_something_else=True):
+    labels = ['anger', 'anticipation', 'disgust', 'fear', 'joy', 'neutral', 'sadness', 'something else', 'surprise', 'trust']
+    if drop_something_else:
+        labels.remove("something else")
+    return labels
 
 # TODO could add a config for the paths
 
@@ -250,11 +253,10 @@ def load(mode:str="M", raw_dataset_path:str="./dataset/raw/MulTweEmo_raw.pkl", c
 
     # remove rows without a label
     id_list = []
-    labels = get_labels()
+    labels = get_labels(drop_something_else)
 
     if drop_something_else:
         dataset = dataset.drop(columns=["something else"])
-        labels.remove("something else")
 
     if build_label_matrix:
         dataset.insert(2, "labels", _build_label_matrix(dataset, labels))

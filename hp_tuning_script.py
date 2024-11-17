@@ -46,7 +46,10 @@ class CVObjective(object):
 
 class NormalObjective(object):
     def __init__(self, clip_version="jina", append_captions:bool=False, freeze_weights:bool=False, seed:int=123):
-        self.train, self.val = MulTweEmoDataset.load(csv_path="./dataset/train_MulTweEmo.csv", mode="M", drop_something_else=True, test_split=0.25, seed=seed)
+        self.train, _ = MulTweEmoDataset.load(csv_path="./dataset/train_MulTweEmo.csv", mode="M", drop_something_else=True, test_split=None, seed=seed)
+        self.val, _ = MulTweEmoDataset.load(csv_path="./dataset/val_MulTweEmo.csv", mode="M", drop_something_else=True, test_split=None, seed=seed)
+
+        print(self.train["tweet"][0])
 
         if append_captions:
             self.train["tweet"] = self.train.apply(lambda x: x["tweet"] + " " + x["caption"], axis=1)
@@ -58,7 +61,7 @@ class NormalObjective(object):
         self.freeze_weights = freeze_weights
 
     def __call__(self, trial):
-        n_epochs = trial.suggest_int("n_epochs", 2, 15, logs=True)
+        n_epochs = trial.suggest_int("n_epochs", 2, 15, log=True)
         learning_rate = trial.suggest_float("learning_rate", 1e-5, 1e-2, log=True)
         warmup_steps = trial.suggest_int("warmup_steps", 0, 200, step=10)
         batch_size = trial.suggest_categorical("batch_size", [8,16,32])
@@ -71,7 +74,6 @@ class NormalObjective(object):
         model.fit(self.train, self.train["labels"])
         predictions, results =  model.score(self.val, self.val["labels"])
         label_names = MulTweEmoDataset.get_labels()
-        label_names.remove("something else")
         metrics = skm.classification_report(self.val["labels"], predictions, output_dict=True, zero_division=0, target_names=label_names)
         for key, value in metrics.items():
             trial.set_user_attr(key, value)
@@ -89,31 +91,26 @@ if __name__ == "__main__":
         prog='train_msa',
         description='Train MSA model',
     )
-    parser.add_argument('-c', '--clip-version', choices=["base", "large", "jina"], type=str, help='clip version for feature extraction')
+    parser.add_argument('-c', '--clip-version', choices=["base", "large", "jina", "blip2"], type=str, help='clip version for feature extraction')
     parser.add_argument("--freeze_weights", action="store_true", help="freezes weights of feature extractor")
     parser.add_argument("--append_captions", action="store_true", help="append auto-generated captions to tweet")
     parser.add_argument("-t", "--trials", type=int, default=None, help="number of trials to run, by default continues until killed")
     parser.add_argument("-T", "--timeout", type=int, default=None, help="how long to continue hpyerparameter searching in seconds, by default continues until killed")
+    parser.add_argument("-s", "--study_name", type=str, default="MulTweEmo_study", help="name of the file where studies will be saved, cannot be a path")
     args = parser.parse_args()
 
     clip = args.clip_version
     
-    if clip == "base":
-        clip_model = "clip_base"
-    elif clip == "large":
-        clip_model = "clip_large"
-    elif clip == "jina":	
-        clip_model = "jina"
-    else:
-        raise ValueError("clip model is invalid, use help to see suported versions")
+    if clip not in ["base", "large", "jina", "blip2"]:
+        raise ValueError("clip model is not valid, use help to see suported versions")
     manual_seed(123)
-    objective = NormalObjective(clip_version=clip_model, append_captions=args.append_captions, freeze_weights=args.freeze_weights, seed=123)
+    objective = NormalObjective(clip_version=clip, append_captions=args.append_captions, freeze_weights=args.freeze_weights, seed=123)
 
-    study_name = f"{clip_model}"  # Unique identifier of the study.
+    study_name = f"{clip}"  # Unique identifier of the study.
     if args.append_captions: study_name += "_append-captions"
     if args.freeze_weights: study_name += "_freeze-weights"
     study_name += "_study"
-    storage_name = "sqlite:///MulTweEmo_study.db"
+    storage_name = f"sqlite:///{args.study_name}.db"
     
     study = optuna.create_study(study_name=study_name,
                                 storage=storage_name, 

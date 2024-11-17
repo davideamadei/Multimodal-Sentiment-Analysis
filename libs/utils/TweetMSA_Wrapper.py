@@ -80,7 +80,8 @@ class TweetMSA_Wrapper(BaseEstimator):
                 per_device_train_batch_size=self.batch_size, 
 
                 push_to_hub=False,
-                disable_tqdm=True
+                disable_tqdm=True,
+                bf16_full_eval=True
                 )
 
         trainer = Trainer(
