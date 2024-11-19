@@ -251,7 +251,7 @@ def load(mode:str="M", raw_dataset_path:str="./dataset/raw/MulTweEmo_raw.pkl", c
 
     # preprocess tweets if necessary
     if preprocess_tweets:
-        dataset = dataset.apply(_preprocess_tweet, axis=1, args=emoji_decoding)
+        dataset = dataset.apply(_preprocess_tweet, axis=1, emoji_decoding=emoji_decoding)
 
     # remove rows without a label
     id_list = []
@@ -285,6 +285,9 @@ def load(mode:str="M", raw_dataset_path:str="./dataset/raw/MulTweEmo_raw.pkl", c
 # TODO potentially handle emoji, urls, mentions with substitution instead of removal
 def _preprocess_tweet(input: dict, emoji_decoding:bool):
     tweet = input["tweet"]
+
+    if emoji_decoding:
+        tweet = emoji.demojize(tweet, delimiters=(" ", " "))
 
     # remove emoji
     emoji_pattern = re.compile("["
@@ -321,8 +324,8 @@ def _preprocess_tweet(input: dict, emoji_decoding:bool):
     
     # converts html character references to actual character, e.g. &amp; to &
     tweet = html.unescape(tweet)
+    
     input["tweet"] = tweet
-
     return input
 
 def _build_label_matrix(dataset, labels):
