@@ -10,9 +10,9 @@ from io import BytesIO
 
 
 class TweetMSAObjective(object):
-    def __init__(self, clip_version="jina", append_captions:bool=False, freeze_weights:bool=False, seed:int=123):
-        self.train, _ = MulTweEmoDataset.load(csv_path="./dataset/train_MulTweEmo.csv", mode="M", drop_something_else=True, test_split=None, seed=seed)
-        self.val, _ = MulTweEmoDataset.load(csv_path="./dataset/val_MulTweEmo.csv", mode="M", drop_something_else=True, test_split=None, seed=seed)
+    def __init__(self, clip_version="jina", append_captions:bool=False, mode="M", freeze_weights:bool=False, seed:int=123):
+        self.train, _ = MulTweEmoDataset.load(csv_path="./dataset/train_MulTweEmo.csv", mode=mode, drop_something_else=True, test_split=None, seed=seed)
+        self.val, _ = MulTweEmoDataset.load(csv_path="./dataset/val_MulTweEmo.csv", mode=mode, drop_something_else=True, test_split=None, seed=seed)
 
         print(self.train["tweet"][0])
 
@@ -29,7 +29,10 @@ class TweetMSAObjective(object):
         n_epochs = trial.suggest_int("n_epochs", 2, 15, log=True)
         learning_rate = trial.suggest_float("learning_rate", 1e-5, 1e-2, log=True)
         warmup_steps = trial.suggest_int("warmup_steps", 0, 200, step=10)
-        batch_size = trial.suggest_categorical("batch_size", [8,16,32])
+        if self.clip_version == "blip2":
+            batch_size = 8
+        else:
+            batch_size = trial.suggest_categorical("batch_size", [8,16,32])
         n_layers = trial.suggest_int("n_layers", 1, 10)
         n_units = trial.suggest_int("n_units", 32, 1024, log=True)
         dropout = trial.suggest_float("dropout", 0.0, 1.0)
@@ -54,8 +57,8 @@ class BertObjective(object):
     
     def __init__(self, bert_version="bert-base-uncased", append_captions:bool=False, mode="M", seed=123):
         self.bert_version = bert_version
-        self.train, _ = MulTweEmoDataset.load(csv_path="./dataset/train_MulTweEmo.csv", mode="M", drop_something_else=True, test_split=None, seed=seed)
-        self.val, _ = MulTweEmoDataset.load(csv_path="./dataset/val_MulTweEmo.csv", mode="M", drop_something_else=True, test_split=None, seed=seed)
+        self.train, _ = MulTweEmoDataset.load(csv_path="./dataset/train_MulTweEmo.csv", mode=mode, drop_something_else=True, test_split=None, seed=seed)
+        self.val, _ = MulTweEmoDataset.load(csv_path="./dataset/val_MulTweEmo.csv", mode=mode, drop_something_else=True, test_split=None, seed=seed)
         
         if append_captions:
             self.train["tweet"] = self.train.apply(lambda x: x["tweet"] + " " + x["caption"], axis=1)
@@ -103,8 +106,8 @@ class VitObjective(object):
     
     def __init__(self, vit_version="google/vit-base-patch16-224", mode="M", seed=123):
         self.vit_version = vit_version
-        self.train, _ = MulTweEmoDataset.load(csv_path="./dataset/train_MulTweEmo.csv", mode="M", drop_something_else=True, test_split=None, seed=seed)
-        self.val, _ = MulTweEmoDataset.load(csv_path="./dataset/val_MulTweEmo.csv", mode="M", drop_something_else=True, test_split=None, seed=seed)
+        self.train, _ = MulTweEmoDataset.load(csv_path="./dataset/train_MulTweEmo.csv", mode=mode, drop_something_else=True, test_split=None, seed=seed)
+        self.val, _ = MulTweEmoDataset.load(csv_path="./dataset/val_MulTweEmo.csv", mode=mode, drop_something_else=True, test_split=None, seed=seed)
         
         self.train = Dataset.from_pandas(self.train)
         self.val = Dataset.from_pandas(self.val)

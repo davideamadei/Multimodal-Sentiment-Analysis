@@ -10,7 +10,7 @@ if __name__ == "__main__":
         prog='train_msa',
         description='Train MSA model',
     )
-    parser.add_argument('-m', '--model', choices=["text", "image", "multimodal"], type=str, default="clip", help="type of model on which hp optimization will be performed")
+    parser.add_argument('-m', '--model', choices=["text", "image", "multimodal"], type=str, default="multimodal", help="type of model on which hp optimization will be performed")
     parser.add_argument('-c', '--clip-version', choices=["base", "large", "jina", "blip2"], type=str, default="jina", help='clip version for feature extraction, multimodal only')
     parser.add_argument("--freeze_weights", action="store_true", help="freezes weights of feature extractor, multimodal only")
     parser.add_argument("--append_captions", action="store_true", help="append auto-generated captions to tweet, multimodal only")

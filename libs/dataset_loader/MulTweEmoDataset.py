@@ -11,7 +11,7 @@ import torch
 import html
 import pathlib
 from sklearn.model_selection import train_test_split
-# import emoji 
+import emoji 
 
 # a list of the possible labels for the dataset
 
@@ -164,7 +164,7 @@ def _create_csv(raw_dataset_path="./dataset/raw/MulTweEmo_raw.pkl", csv_path="./
 
 def load(mode:str="M", raw_dataset_path:str="./dataset/raw/MulTweEmo_raw.pkl", csv_path:str="./dataset/MulTweEmo.csv", 
         image_path:str="./dataset/images", image_zip_path:str="./dataset/raw/images.zip",
-        force_override=False, preprocess_tweets=True, build_label_matrix=True, drop_something_else=True,
+        force_override=False, preprocess_tweets=True, emoji_decoding=False, build_label_matrix=True, drop_something_else=True,
         create_dataset=False, test_split:float=0.2, seed:int=None)->tuple[pd.DataFrame]:
         
     """function to load the MulTweEmo dataset, downloads dataset if not cached. The processed dataset for further uses is also saved as a csv
@@ -185,6 +185,8 @@ def load(mode:str="M", raw_dataset_path:str="./dataset/raw/MulTweEmo_raw.pkl", c
         flag to overwrite the dataset, by default False
     preprocess_tweets : bool, optional
         flag to decide application of tweet preprocessing, by default True
+    emoji_decoding : bool, optional
+        flag to decide application if emojis will be replaced with their textual representation, by default False
     build_label_matrix : bool, optional
         flag to also add labels as a list of lists, by default True
     drop_something_else : bool, optional
@@ -249,7 +251,7 @@ def load(mode:str="M", raw_dataset_path:str="./dataset/raw/MulTweEmo_raw.pkl", c
 
     # preprocess tweets if necessary
     if preprocess_tweets:
-        dataset = dataset.apply(_preprocess_tweet, axis=1)
+        dataset = dataset.apply(_preprocess_tweet, axis=1, args=emoji_decoding)
 
     # remove rows without a label
     id_list = []
@@ -281,30 +283,30 @@ def load(mode:str="M", raw_dataset_path:str="./dataset/raw/MulTweEmo_raw.pkl", c
     # return dataset.train_test_split(test_size=test_split, seed=seed, shuffle=True)
 
 # TODO potentially handle emoji, urls, mentions with substitution instead of removal
-def _preprocess_tweet(input: dict):
+def _preprocess_tweet(input: dict, emoji_decoding:bool):
     tweet = input["tweet"]
 
-    # # remove emoji
-    # emoji_pattern = re.compile("["
-    #     u"\U0001F600-\U0001F64F"  # emoticons
-    #     u"\U0001F300-\U0001F5FF"  # symbols & pictographs
-    #     u"\U0001F680-\U0001F6FF"  # transport & map symbols
-    #     u"\U0001F1E0-\U0001F1FF"  # flags (iOS)
-    #     u"\U00002500-\U00002BEF"  # chinese char
-    #     u"\U00002702-\U000027B0"
-    #     u"\U000024C2-\U0001F251"
-    #     u"\U0001f926-\U0001f937"
-    #     u"\U00010000-\U0010ffff"
-    #     u"\u2640-\u2642" 
-    #     u"\u2600-\u2B55"
-    #     u"\u200d"
-    #     u"\u23cf"
-    #     u"\u23e9"
-    #     u"\u231a"
-    #     u"\ufe0f"  # dingbats
-    #     u"\u3030"
-    #     "]+", flags=re.UNICODE)
-    # tweet = re.sub(emoji_pattern,'',tweet)
+    # remove emoji
+    emoji_pattern = re.compile("["
+        u"\U0001F600-\U0001F64F"  # emoticons
+        u"\U0001F300-\U0001F5FF"  # symbols & pictographs
+        u"\U0001F680-\U0001F6FF"  # transport & map symbols
+        u"\U0001F1E0-\U0001F1FF"  # flags (iOS)
+        u"\U00002500-\U00002BEF"  # chinese char
+        u"\U00002702-\U000027B0"
+        u"\U000024C2-\U0001F251"
+        u"\U0001f926-\U0001f937"
+        u"\U00010000-\U0010ffff"
+        u"\u2640-\u2642" 
+        u"\u2600-\u2B55"
+        u"\u200d"
+        u"\u23cf"
+        u"\u23e9"
+        u"\u231a"
+        u"\ufe0f"  # dingbats
+        u"\u3030"
+        "]+", flags=re.UNICODE)
+    tweet = re.sub(emoji_pattern,'',tweet)
 
     # remove urls
     url_pattern = re.compile(r'https?://\S+|www\.\S+?')
