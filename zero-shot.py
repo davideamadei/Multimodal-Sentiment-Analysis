@@ -6,17 +6,29 @@ from io import BytesIO
 from libs.model import TweetMSAConfig
 import torch
 import numpy as np
+import argparse
+
 if __name__ == "__main__":
-    clip_versions = ["clip_base", "jina", "clip_large"]
+    parser = argparse.ArgumentParser(
+        prog='zero shot image classification',
+        description='Zero shot classification on the images only. Predictions are done with clip base, jina clip and clip large',
+    )
+    parser.add_argument("--test_size", type=float, default=0.2)
+    parser.add_argument("--seed", type=int, default=123)
+    parser.add_argument("-o", "--output", type=str, default="zero-shot-predictions.np")
+    parser.add_argument("-p", "--prompt", type=str, default="This picture evokes")
+    args = parser.parse_args()
+
+    feature_extractors = ["base", "jina", "large"]
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     predictions = []
 
-    for clip_version in clip_versions:
-        processor = AutoProcessor.from_pretrained(TweetMSAConfig.get_feature_extractor_name(clip_version), trust_remote_code=True)
+    for feature_extractor in feature_extractors:
+        processor = AutoProcessor.from_pretrained(TweetMSAConfig.get_feature_extractor_name(feature_extractor), trust_remote_code=True)
 
-        model = AutoModel.from_pretrained(TweetMSAConfig.get_feature_extractor_name(clip_version), trust_remote_code=True)
+        model = AutoModel.from_pretrained(TweetMSAConfig.get_feature_extractor_name(feature_extractor), trust_remote_code=True)
         model.to(device)
         mode="M"
         train, _ = MulTweEmoDataset.load(csv_path="./dataset/train_MulTweEmo.csv", mode=mode, drop_something_else=True, force_override=True, test_split=None, seed=123)
@@ -36,7 +48,7 @@ if __name__ == "__main__":
 
         emotions = MulTweEmoDataset.get_labels()
         emotions.remove("something else")
-        candidate_labels = [f"This picture evokes {label}" for label in emotions]
+        candidate_labels = [f"{args.prompt} {label}" for label in emotions]
 
         inputs = processor(images=processed_images, text=candidate_labels, return_tensors="pt", padding=True)
         inputs.to(device)
@@ -50,5 +62,5 @@ if __name__ == "__main__":
         del processor
 
     predictions = np.array(predictions)
-    with open(f"zero_shot_predictions", "wb") as f:
+    with open(args.output, "wb") as f:
         np.save(f, predictions)
