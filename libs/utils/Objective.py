@@ -14,7 +14,6 @@ class TweetMSAObjective(object):
         self.train, _ = MulTweEmoDataset.load(csv_path="./dataset/train_MulTweEmo.csv", mode=mode, drop_something_else=True, test_split=None, seed=seed)
         self.val, _ = MulTweEmoDataset.load(csv_path="./dataset/val_MulTweEmo.csv", mode=mode, drop_something_else=True, test_split=None, seed=seed)
 
-        print(self.train["tweet"][0])
 
         if append_captions:
             self.train["tweet"] = self.train.apply(lambda x: x["tweet"] + " " + x["caption"], axis=1)
@@ -142,7 +141,6 @@ class VitObjective(object):
     def _preprocess_data(self, examples):
         processor = AutoImageProcessor.from_pretrained("google/vit-base-patch16-224")
         images = examples["img_path"]
-        print(images)
         processed_images= []
         for img in images:
             if isinstance(img, str):

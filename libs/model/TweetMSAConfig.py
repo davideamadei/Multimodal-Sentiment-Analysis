@@ -16,8 +16,8 @@ class TweetMSAConfig(PretrainedConfig):
         **kwargs) -> None:
       
       # TODO: clip_large is currently not working
-      if feature_extractor not in ["jina", "base", "large", "blip2"]:
-        raise ValueError("Only the following models are accepted for feature extraction:\n" + "\n".join(["jina", "base", "large", "blip2"]))
+      if feature_extractor not in ["jina", "base", "large", "siglip", "blip2"]:
+        raise ValueError("Only the following models are accepted for feature extraction:\n" + "\n".join(["jina", "base", "large", "siglip", "blip2"]))
       if n_layers <= 0:
         raise ValueError("The number of layers must be a positive integer")
       if n_units <= 0:
@@ -41,4 +41,8 @@ class TweetMSAConfig(PretrainedConfig):
 
     @staticmethod
     def get_feature_extractor_name(feature_extractor):
-      return {"jina" : "jinaai/jina-clip-v1", "base" : "openai/clip-vit-base-patch32", "large" : "openai/clip-vit-large-patch14", "blip2": "Salesforce/blip2-itm-vit-g-coco"}[feature_extractor]
+      return {"jina" : "jinaai/jina-clip-v1", 
+              "base" : "openai/clip-vit-base-patch32", 
+              "large" : "openai/clip-vit-large-patch14", 
+              "siglip" : "google/siglip-so400m-patch16-256-i18n", 
+              "blip2": "Salesforce/blip2-itm-vit-g-coco"}[feature_extractor]

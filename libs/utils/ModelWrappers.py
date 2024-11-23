@@ -34,7 +34,7 @@ class TweetMSAWrapper(BaseEstimator):
     def fit(self, X, y):
         self._create_model(X)
         self._trainer.train()
-        self._is_fitted  = True
+        self._is_fitted = True
         return self
     
     def score(self, X, y):
@@ -55,6 +55,7 @@ class TweetMSAWrapper(BaseEstimator):
         check_is_fitted(self)
         return self._trainer.predict(X)
 
+#TODO: add interface to load checkpoint
     def _create_model(self, X):
         config = TweetMSAConfig(feature_extractor=self.clip_version, layers=self.n_layers, n_units=self.n_units, dropout_p=self.dropout)
         model = TweetMSA(config).cuda()

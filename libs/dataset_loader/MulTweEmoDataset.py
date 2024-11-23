@@ -325,6 +325,9 @@ def _preprocess_tweet(input: dict, emoji_decoding:bool):
     # converts html character references to actual character, e.g. &amp; to &
     tweet = html.unescape(tweet)
     
+    if emoji_decoding:
+        tweet=tweet.replace("_", " ")
+
     input["tweet"] = tweet
     return input
 

@@ -79,7 +79,7 @@ class TweetMSA(PreTrainedModel):
 
     @staticmethod
     def preprocess_dataset(dataset, model="jina", text_column="tweet", image_column="img_path", label_column=None):
-        if model not in ["jina", "base", "large", "blip2"]:
+        if model not in ["jina", "base", "large", "siglip", "blip2"]:
             raise ValueError("Only the following models are accepted:\n" + "\n".join(["jina", "base", "large", "blip2"]))
         
         processor = AutoProcessor.from_pretrained(TweetMSAConfig.get_feature_extractor_name(model), trust_remote_code=True)

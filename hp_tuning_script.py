@@ -11,7 +11,7 @@ if __name__ == "__main__":
         description='Train MSA model',
     )
     parser.add_argument('-m', '--model', choices=["text", "image", "multimodal"], type=str, default="multimodal", help="type of model on which hp optimization will be performed")
-    parser.add_argument('-c', '--clip-version', choices=["base", "large", "jina", "blip2"], type=str, default="jina", help='clip version for feature extraction, multimodal only')
+    parser.add_argument('-c', '--clip-version', choices=["base", "large", "jina", "siglip", "blip2"], type=str, default="jina", help='clip version for feature extraction, multimodal only')
     parser.add_argument("--freeze_weights", action="store_true", help="freezes weights of feature extractor, multimodal only")
     parser.add_argument("--append_captions", action="store_true", help="append auto-generated captions to tweet, multimodal only")
     parser.add_argument("-t", "--trials", type=int, default=None, help="number of trials to run, by default continues until killed")
@@ -35,7 +35,7 @@ if __name__ == "__main__":
     if model not in ["text", "image", "multimodal"]:
         raise ValueError("type of model to optimize is not valid, use help to see suported models")
     
-    if model == "multimodal" and clip not in ["base", "large", "jina", "blip2"]:
+    if model == "multimodal" and clip not in ["base", "large", "jina", "siglip", "blip2"]:
         raise ValueError("clip model is not valid, use help to see suported versions")
 
     if mode not in ["M", "T"]:
