@@ -17,7 +17,7 @@ class TweetMSAObjective(object):
 
         if append_captions:
             self.train["tweet"] = self.train.apply(lambda x: x["tweet"] + " " + x["caption"], axis=1)
-            self.val["tweet"] = self.val.apply(lambda x: x["tweet"] + " "  + x["caption"], axis=1)
+        #    self.val["tweet"] = self.val.apply(lambda x: x["tweet"] + " "  + x["caption"], axis=1)
 
         self.train = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=self.train, model=clip_version, text_column="tweet", label_column="labels"))
         self.val = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=self.val, model=clip_version, text_column="tweet", label_column="labels"))
@@ -28,7 +28,7 @@ class TweetMSAObjective(object):
         n_epochs = trial.suggest_int("n_epochs", 2, 15, log=True)
         learning_rate = trial.suggest_float("learning_rate", 1e-5, 1e-2, log=True)
         warmup_steps = trial.suggest_int("warmup_steps", 0, 200, step=10)
-        if self.clip_version == "blip2":
+        if self.clip_version == "siglip" or self.clip_version == "blip2":
             batch_size = 8
         else:
             batch_size = trial.suggest_categorical("batch_size", [8,16,32])
@@ -54,10 +54,10 @@ class TweetMSAObjective(object):
     
 class BertObjective(object):
     
-    def __init__(self, bert_version="bert-base-uncased", append_captions:bool=False, mode="M", seed=123):
+    def __init__(self, bert_version="bert-large-uncased", append_captions:bool=False, mode="M", seed=123):
         self.bert_version = bert_version
         self.train, _ = MulTweEmoDataset.load(csv_path="./dataset/train_MulTweEmo.csv", mode=mode, drop_something_else=True, test_split=None, seed=seed)
-        self.val, _ = MulTweEmoDataset.load(csv_path="./dataset/val_MulTweEmo.csv", mode=mode, drop_something_else=True, test_split=None, seed=seed)
+#        self.val, _ = MulTweEmoDataset.load(csv_path="./dataset/val_MulTweEmo.csv", mode=mode, drop_something_else=True, test_split=None, seed=seed)
         
         if append_captions:
             self.train["tweet"] = self.train.apply(lambda x: x["tweet"] + " " + x["caption"], axis=1)
@@ -103,7 +103,7 @@ class BertObjective(object):
 
 class VitObjective(object):
     
-    def __init__(self, vit_version="google/vit-base-patch16-224", mode="M", seed=123):
+    def __init__(self, vit_version="google/vit-large-patch16-224-in21k", mode="M", seed=123):
         self.vit_version = vit_version
         self.train, _ = MulTweEmoDataset.load(csv_path="./dataset/train_MulTweEmo.csv", mode=mode, drop_something_else=True, test_split=None, seed=seed)
         self.val, _ = MulTweEmoDataset.load(csv_path="./dataset/val_MulTweEmo.csv", mode=mode, drop_something_else=True, test_split=None, seed=seed)
@@ -139,7 +139,7 @@ class VitObjective(object):
         return results["loss"], results["f1_score"], results["exact_match"]
     
     def _preprocess_data(self, examples):
-        processor = AutoImageProcessor.from_pretrained("google/vit-base-patch16-224")
+        processor = AutoImageProcessor.from_pretrained(self.vit_version)
         images = examples["img_path"]
         processed_images= []
         for img in images:

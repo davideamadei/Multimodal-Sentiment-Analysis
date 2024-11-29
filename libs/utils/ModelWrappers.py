@@ -97,7 +97,7 @@ class TweetMSAWrapper(BaseEstimator):
 
 class BertWrapper(BaseEstimator):
 
-    def __init__(self, bert_version="bert-base-uncased", learning_rate:float=1e-5, batch_size:int=16, n_epochs:int=10, warmup_steps:int=100):
+    def __init__(self, bert_version="bert-large-uncased", learning_rate:float=1e-5, batch_size:int=16, n_epochs:int=10, warmup_steps:int=100):
         super().__init__()
         self.bert_version = bert_version
         self.learning_rate = learning_rate
@@ -175,7 +175,7 @@ class BertWrapper(BaseEstimator):
 
 class VitWrapper(BaseEstimator):
 
-    def __init__(self, vit_version="google/vit-base-patch16-224", learning_rate:float=1e-5, batch_size:int=16, n_epochs:int=10, warmup_steps:int=100):
+    def __init__(self, vit_version="google/vit-large-patch16-224-in21k", learning_rate:float=1e-5, batch_size:int=16, n_epochs:int=10, warmup_steps:int=100):
         super().__init__()
         self.vit_version = vit_version
         self.learning_rate = learning_rate

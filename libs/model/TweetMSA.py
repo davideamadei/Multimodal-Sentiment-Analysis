@@ -25,10 +25,13 @@ class TweetMSA(PreTrainedModel):
         self.fc_layers = nn.ModuleList()
 
         input_layer = nn.Sequential()
-        if self.config.feature_extractor_name_simple != "blip2":
-            input_layer.append(nn.Linear(self.feature_extractor.config.projection_dim*2, config.n_units))
-        else:
+        if self.config.feature_extractor_name_simple == "blip2":
             input_layer.append(nn.Linear(256*2, config.n_units))
+        elif self.config.feature_extractor_name_simple == "siglip":
+            input_layer.append(nn.Linear(1152*2, config.n_units))
+        else:
+            input_layer.append(nn.Linear(self.feature_extractor.config.projection_dim*2, config.n_units))
+
         input_layer.append(nn.Dropout(config.dropout_p))
         input_layer.append(nn.LeakyReLU())
         self.fc_layers.append(input_layer)
@@ -55,7 +58,7 @@ class TweetMSA(PreTrainedModel):
             nn.init.xavier_normal_(m.weight)
             m.bias.data.fill_(0.01)
 
-    def forward(self, input_ids, attention_mask, pixel_values, labels=None):
+    def forward(self, input_ids, pixel_values, attention_mask=None, labels=None):
         if self.config.feature_extractor_name_simple != "blip2":
             text_embedding = self.feature_extractor.get_text_features(input_ids=input_ids, attention_mask=attention_mask)
             image_embedding = self.feature_extractor.get_image_features(pixel_values=pixel_values)
@@ -63,7 +66,7 @@ class TweetMSA(PreTrainedModel):
             itm_out = self.feature_extractor(input_ids=input_ids, attention_mask=attention_mask, 
                                              pixel_values=pixel_values, use_image_text_matching_head=False, return_dict=True)
             text_embedding = itm_out.text_embeds
-            image_embedding = itm_out.image_embeds[:,0,:]
+            image_embedding = itm_out.image_embeds.mean(dim=1)
         logits = concatenate((text_embedding, image_embedding), axis=-1)
 
         for layer in self.fc_layers:
@@ -104,13 +107,16 @@ class TweetMSA(PreTrainedModel):
                                         images = processed_images, 
                                         padding=True, truncation=True, 
                                         return_tensors="np"
-                                        )
+                                  )
+        for key in processed_inputs.keys():
+           print(key)
+        processed_dataset = pd.DataFrame({key: processed_inputs[key].tolist() for key in processed_inputs.keys()})
 
-        processed_dataset = pd.DataFrame({
-            "input_ids": processed_inputs["input_ids"].tolist(),
-            "attention_mask": processed_inputs["attention_mask"].tolist(), 
-            "pixel_values": processed_inputs["pixel_values"].tolist()
-        })
+#        processed_dataset = pd.DataFrame({
+#            "input_ids": processed_inputs["input_ids"].tolist(),
+#            "attention_mask": processed_inputs["attention_mask"].tolist(), 
+#            "pixel_values": processed_inputs["pixel_values"].tolist()
+#        })
         if label_column is not None:
             processed_dataset[label_column] = dataset[label_column].to_list()
         return processed_dataset
