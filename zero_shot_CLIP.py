@@ -13,7 +13,6 @@ if __name__ == "__main__":
         prog='zero shot image classification',
         description='Zero shot classification on the images only. Predictions are done with clip base, jina clip and clip large',
     )
-    parser.add_argument("--test_size", type=float, default=0.2)
     parser.add_argument("--seed", type=int, default=123)
     parser.add_argument("-o", "--output", type=str, default="zero-shot-predictions.np")
     parser.add_argument("-p", "--prompt", type=str, default="This picture evokes")
@@ -47,7 +46,6 @@ if __name__ == "__main__":
             processed_images.append(image)
 
         emotions = MulTweEmoDataset.get_labels()
-        emotions.remove("something else")
         candidate_labels = [f"{args.prompt} {label}" for label in emotions]
 
         inputs = processor(images=processed_images, text=candidate_labels, return_tensors="pt", padding=True)

@@ -57,12 +57,16 @@ class BertObjective(object):
     def __init__(self, bert_version="bert-large-uncased", append_captions:bool=False, mode="M", seed=123):
         self.bert_version = bert_version
         self.train, _ = MulTweEmoDataset.load(csv_path="./dataset/train_MulTweEmo.csv", mode=mode, drop_something_else=True, test_split=None, seed=seed)
-#        self.val, _ = MulTweEmoDataset.load(csv_path="./dataset/val_MulTweEmo.csv", mode=mode, drop_something_else=True, test_split=None, seed=seed)
+        self.val, _ = MulTweEmoDataset.load(csv_path="./dataset/val_MulTweEmo.csv", mode=mode, drop_something_else=True, test_split=None, seed=seed)
         
         if append_captions:
             self.train["tweet"] = self.train.apply(lambda x: x["tweet"] + " " + x["caption"], axis=1)
-            self.val["tweet"] = self.val.apply(lambda x: x["tweet"] + " "  + x["caption"], axis=1)
-        
+            # self.val["tweet"] = self.val.apply(lambda x: x["tweet"] + " "  + x["caption"], axis=1)
+        else:
+            self.train = self.train.drop_duplicates(subset=["id"])
+            self.val = self.val[~self.val.id.isin(self.train.id.values)]
+
+
         self.train = Dataset.from_pandas(self.train)
         self.val = Dataset.from_pandas(self.val)
 
