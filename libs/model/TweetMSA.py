@@ -108,8 +108,7 @@ class TweetMSA(PreTrainedModel):
                                         padding=True, truncation=True, 
                                         return_tensors="np"
                                   )
-        for key in processed_inputs.keys():
-           print(key)
+
         processed_dataset = pd.DataFrame({key: processed_inputs[key].tolist() for key in processed_inputs.keys()})
 
 #        processed_dataset = pd.DataFrame({
