@@ -21,6 +21,19 @@ def get_labels(drop_something_else=True):
         labels.remove("something else")
     return labels
 
+def get_id2label(drop_something_else=True):
+    id2label = {}
+    for i, label in enumerate(get_labels(drop_something_else)):
+        id2label[i] = label
+    return id2label
+
+def get_label2id(drop_something_else=True):
+    label2id = {}
+    for i, label in enumerate(get_labels(drop_something_else)):
+        label2id[label] = i
+    return label2id
+    
+
 # TODO could add a config for the paths
 
 def _download_dataset(raw_dataset_path="./dataset/raw/MulTweEmo_raw.pkl", image_zip_path="./dataset/raw/images.zip",

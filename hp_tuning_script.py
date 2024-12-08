@@ -14,6 +14,7 @@ if __name__ == "__main__":
     parser.add_argument('-c', '--clip-version', choices=["base", "large", "jina", "siglip", "blip2"], type=str, default="jina", help='clip version for feature extraction, multimodal only')
     parser.add_argument("--freeze_weights", action="store_true", help="freezes weights of feature extractor, multimodal only")
     parser.add_argument("--append_captions", action="store_true", help="append auto-generated captions to tweet, multimodal only")
+    parser.add_argument("--data_augment", action="store_true", help="use both normal data and data augmented with captions")
     parser.add_argument("--process_emojis", action="store_true", help="replace emojis with text representation")
     parser.add_argument("-t", "--trials", type=int, default=None, help="number of trials to run, by default continues until killed")
     parser.add_argument("-T", "--timeout", type=int, default=None, help="how long to continue hpyerparameter searching in seconds, by default continues until killed")
@@ -27,8 +28,8 @@ if __name__ == "__main__":
     mode = args.mode
     seed = args.seed
 
-    if model != "multimodal" and args.freeze_weights:
-        raise ValueError("--freeze_weights cannot be passed for non multimodal model")
+    if model != "multimodal" and (args.freeze_weights or args.data_augment):
+        raise ValueError("--freeze_weights and --data_augment cannot be passed for non multimodal model")
     
     if model == "image" and args.append_captions: 
         raise ValueError("--append_captions cannot be passed for image only model")
@@ -58,6 +59,7 @@ if __name__ == "__main__":
     if model != "image" and args.append_captions: study_name += "_append-captions"
     if model != "image" and args.process_emojis: study_name += "_process_emojis"
     if model == "multimodal" and args.freeze_weights: study_name += "_freeze-weights"
+    if model == "multimodal" and args.data_augment: study_name += "_data_augment"
     study_name += "_study"
     storage_name = f"sqlite:///{args.study_name}.db"
     

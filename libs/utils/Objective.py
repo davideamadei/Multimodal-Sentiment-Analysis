@@ -7,10 +7,11 @@ from transformers import AutoTokenizer, AutoImageProcessor
 import requests
 from PIL import Image
 from io import BytesIO
+import pandas as pd
 
 
 class TweetMSAObjective(object):
-    def __init__(self, clip_version="jina", append_captions:bool=False, process_emojis:bool=False, mode="M", freeze_weights:bool=False, seed:int=123):
+    def __init__(self, clip_version="jina", append_captions:bool=False, process_emojis:bool=False, data_augment:bool=False, mode="M", freeze_weights:bool=False, seed:int=123):
         self.train, _ = MulTweEmoDataset.load(csv_path="./dataset/train_MulTweEmo.csv", mode=mode, drop_something_else=True,
                                                emoji_decoding=process_emojis, test_split=None, seed=seed)
         self.val, _ = MulTweEmoDataset.load(csv_path="./dataset/val_MulTweEmo.csv", mode=mode, drop_something_else=True,
@@ -18,8 +19,18 @@ class TweetMSAObjective(object):
 
 
         if append_captions:
-            self.train["tweet"] = self.train.apply(lambda x: x["tweet"] + " " + x["caption"], axis=1)
+            tweet_caption_data = self.train.apply(lambda x: x["tweet"] + " " + x["caption"], axis=1)
+            if data_augment:
+                tweet_caption_train = self.train.copy()
+                tweet_caption_train["tweet"] = tweet_caption_data
+                # caption_train = self.train.copy()
+                # caption_train["tweet"] = caption_train["caption"]
+                # self.train = pd.concat(self.train, caption_train)
+                self.train = pd.concat(self.train, tweet_caption_train)
+            else:
+                self.train["tweet"] = tweet_caption_data
         #    self.val["tweet"] = self.val.apply(lambda x: x["tweet"] + " "  + x["caption"], axis=1)
+
 
         self.train = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=self.train, model=clip_version, text_column="tweet", label_column="labels"))
         self.val = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=self.val, model=clip_version, text_column="tweet", label_column="labels"))
