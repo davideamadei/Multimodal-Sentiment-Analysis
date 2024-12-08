@@ -19,23 +19,24 @@ if __name__ == "__main__":
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     predictions = []
-
+    labels = MulTweEmoDataset.get_labels()
     processor = LlavaNextProcessor.from_pretrained("llava-hf/llama3-llava-next-8b-hf")
     model = LlavaNextForConditionalGeneration.from_pretrained(
         "llava-hf/llama3-llava-next-8b-hf", 
         torch_dtype=torch.float16, 
         low_cpu_mem_usage=True,
-        load_in_4bit=True
+        load_in_4bit=False
     )
     model.to(device)
     
     mode="M"
     train, _ = MulTweEmoDataset.load(csv_path="./dataset/MulTweEmo.csv", mode=mode, drop_something_else=True, force_override=True, test_split=None, seed=123)
 
-    train = train.head(5)
-
-    prompt_format = lambda text: f"The image is paired with this text: {text}. Considering both image and text, choose which emotions are most elicited among this list: \
-        [anger, anticipation, disgust, fear, joy, neutral, sadness, surprise, trust]. Answer with only the list of chosen emotions."
+    train = train.head(20)
+#    index = 0
+#    train = train.iloc[index:index+1]
+    prompt_format = lambda text: f"The image is paired with this text: \"{text}\". Considering both image and text, choose which emotions are most elicited among this list: \
+{labels}. Answer with only the list of chosen emotions."
     prompts = []
 
     for i, row in train.iterrows():
@@ -49,7 +50,6 @@ if __name__ == "__main__":
             },
         ]
         prompts.append(processor.apply_chat_template(conversation, add_generation_prompt=True))
-
     processed_images= []
     for img in train["img_path"]:
         if isinstance(img, str):
@@ -63,10 +63,36 @@ if __name__ == "__main__":
         else:
             raise ValueError("Unsupported image format")
         processed_images.append(image)
-
-    inputs = processor(images=processed_images, text=prompts, return_tensors="pt", padding=True)
-    inputs.to(device)
-
+    inputs = []
+    for i in range(len(prompts)):
+        inputs.append(processor(images=processed_images[i], text=prompts[i], return_tensors="pt", padding=True).to(device))
+    outputs = []
+    with torch.no_grad():
+        for i in range(len(inputs)):
+    #       for i in range(1):
+                generate_ids = model.generate(**(inputs[i]))
+    #           generate_ids = model.generate(input_ids=inputs["input_ids"][i:i+1], attention_mask=inputs["attention_mask"][i:i+1], pixel_values=inputs["pixel_values"][i:i+1], image_sizes=inputs["image_sizes"][i:i+1])
+                outputs.append(processor.decode(generate_ids[0, inputs[i]["input_ids"].shape[1]:], skip_special_tokens=True))
     # Generate
-    generate_ids = model.generate(**inputs, max_new_tokens=30)
-    processor.batch_decode(generate_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)
+#       generate_ids = model.generate(**inputs, max_new_tokens=100)
+#       outputs =  processor.batch_decode(generate_ids[:, inputs["input_ids"].shape[1]:], skip_special_tokens=True)
+
+    predictions = []
+    translate_table = dict.fromkeys(map(ord, '\n[] '), None)
+    for item in outputs:
+        item = item.translate(translate_table)
+        predictions.append(item.split(","))
+    print(predictions)
+    tmp = []
+    n_labels = len(labels)
+    label2id = MulTweEmoDataset.get_label2id()
+    for item in predictions:
+        pred = [0] * n_labels
+        for label in item:
+            pred[label2id[label]] = 1
+        tmp.append(pred)
+    print(tmp)
+
+    # kek = np.array(tmp)
+    # with open(args.output, "wb") as f:
+    #     np.save(f, kek)
