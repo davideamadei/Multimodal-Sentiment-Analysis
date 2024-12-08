@@ -10,9 +10,11 @@ from io import BytesIO
 
 
 class TweetMSAObjective(object):
-    def __init__(self, clip_version="jina", append_captions:bool=False, mode="M", freeze_weights:bool=False, seed:int=123):
-        self.train, _ = MulTweEmoDataset.load(csv_path="./dataset/train_MulTweEmo.csv", mode=mode, drop_something_else=True, test_split=None, seed=seed)
-        self.val, _ = MulTweEmoDataset.load(csv_path="./dataset/val_MulTweEmo.csv", mode=mode, drop_something_else=True, test_split=None, seed=seed)
+    def __init__(self, clip_version="jina", append_captions:bool=False, process_emojis:bool=False, mode="M", freeze_weights:bool=False, seed:int=123):
+        self.train, _ = MulTweEmoDataset.load(csv_path="./dataset/train_MulTweEmo.csv", mode=mode, drop_something_else=True,
+                                               emoji_decoding=process_emojis, test_split=None, seed=seed)
+        self.val, _ = MulTweEmoDataset.load(csv_path="./dataset/val_MulTweEmo.csv", mode=mode, drop_something_else=True,
+                                               emoji_decoding=process_emojis, test_split=None, seed=seed)
 
 
         if append_captions:
@@ -54,10 +56,12 @@ class TweetMSAObjective(object):
     
 class BertObjective(object):
     
-    def __init__(self, bert_version="bert-large-uncased", append_captions:bool=False, mode="M", seed=123):
+    def __init__(self, bert_version="bert-large-uncased", append_captions:bool=False, process_emojis:bool=False, mode="M", seed=123):
         self.bert_version = bert_version
-        self.train, _ = MulTweEmoDataset.load(csv_path="./dataset/train_MulTweEmo.csv", mode=mode, drop_something_else=True, test_split=None, seed=seed)
-        self.val, _ = MulTweEmoDataset.load(csv_path="./dataset/val_MulTweEmo.csv", mode=mode, drop_something_else=True, test_split=None, seed=seed)
+        self.train, _ = MulTweEmoDataset.load(csv_path="./dataset/train_MulTweEmo.csv", mode=mode, drop_something_else=True,
+                                               emoji_decoding=process_emojis, test_split=None, seed=seed)
+        self.val, _ = MulTweEmoDataset.load(csv_path="./dataset/val_MulTweEmo.csv", mode=mode, drop_something_else=True,
+                                               emoji_decoding=process_emojis, test_split=None, seed=seed)
         
         if append_captions:
             self.train["tweet"] = self.train.apply(lambda x: x["tweet"] + " " + x["caption"], axis=1)
