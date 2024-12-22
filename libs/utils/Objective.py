@@ -79,6 +79,7 @@ class BertObjective(object):
             # self.val["tweet"] = self.val.apply(lambda x: x["tweet"] + " "  + x["caption"], axis=1)
         else:
             self.train = self.train.drop_duplicates(subset=["id"])
+            self.val = self.val.drop_duplicates(subset=["id"])
             self.val = self.val[~self.val.id.isin(self.train.id.values)]
 
 
