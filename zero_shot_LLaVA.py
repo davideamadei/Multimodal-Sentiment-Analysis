@@ -34,7 +34,9 @@ if __name__ == "__main__":
     mode="M"
     test_data, _ = MulTweEmoDataset.load(csv_path="./dataset/test_MulTweEmo.csv", mode=mode, drop_something_else=True, force_override=True, test_split=None, seed=123)
 
-    predictions = np.zeros(len(test_data), len(labels))
+    predictions = np.zeros((len(test_data), len(labels)))
+    translate_table = dict.fromkeys(map(ord, '\n[]\' '), None)
+    label2id = MulTweEmoDataset.get_label2id()
 
     if not args.binary_prediction:
         prompt_format = lambda text: f"The image is paired with this text: \"{text}\". Considering both image and text, choose which emotions are most elicited among this list: {labels}. Answer with only the list of chosen emotions."
@@ -68,20 +70,13 @@ if __name__ == "__main__":
                 inputs = processor(images=img, text=prompt, return_tensors="pt", padding=True).to(device)
 
                 generate_ids = model.generate(**(inputs))
-                outputs.append(processor.decode(generate_ids[0, inputs["input_ids"].shape[1]:], skip_special_tokens=True))
+                output = processor.decode(generate_ids[0, inputs["input_ids"].shape[1]:], skip_special_tokens=True)
 
-        model_predictions = []
-        translate_table = dict.fromkeys(map(ord, '\n[]\' '), None)
-        for item in outputs:
-            item = item.translate(translate_table)
-            predictions.append(item.split(","))        
-
-        n_labels = len(labels)
-        label2id = MulTweEmoDataset.get_label2id()
-        for i in range(len(model_predictions)):
-            for label in item:
-                if label in labels:
-                    predictions[i][label2id[label]] = 1
+                output = output.translate(translate_table)
+                output = output.split(",")
+                for label in output:
+                    if label in labels:
+                        predictions[i][label2id[label]] = 1
 
     else:
         prompt_format = lambda text, emotion: f"The image is paired with this text: \"{text}\". When looking at both image and text, is the emotion evoked \"{emotion}\"? Answer with Yes or no."
