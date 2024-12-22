@@ -30,16 +30,15 @@ if __name__ == "__main__":
     model.to(device)
     
     mode="M"
-    train, _ = MulTweEmoDataset.load(csv_path="./dataset/test_MulTweEmo.csv", mode=mode, drop_something_else=True, force_override=True, test_split=None, seed=123)
+    test_data, _ = MulTweEmoDataset.load(csv_path="./dataset/test_MulTweEmo.csv", mode=mode, drop_something_else=True, force_override=True, test_split=None, seed=123)
 
-    train = train.head(20)
 #    index = 0
 #    train = train.iloc[index:index+1]
     prompt_format = lambda text: f"The image is paired with this text: \"{text}\". Considering both image and text, choose which emotions are most elicited among this list: \
 {labels}. Answer with only the list of chosen emotions."
     prompts = []
 
-    for i, row in train.iterrows():
+    for i, row in test_data.iterrows():
         conversation = [
             {
                 "role": "user",
@@ -51,7 +50,7 @@ if __name__ == "__main__":
         ]
         prompts.append(processor.apply_chat_template(conversation, add_generation_prompt=True))
     processed_images= []
-    for img in train["img_path"]:
+    for img in test_data["img_path"]:
         if isinstance(img, str):
             if img.startswith('http'):
                 response = requests.get(img)
@@ -78,21 +77,21 @@ if __name__ == "__main__":
 #       outputs =  processor.batch_decode(generate_ids[:, inputs["input_ids"].shape[1]:], skip_special_tokens=True)
 
     predictions = []
-    translate_table = dict.fromkeys(map(ord, '\n[] '), None)
+    translate_table = dict.fromkeys(map(ord, '\n[]\' '), None)
     for item in outputs:
         item = item.translate(translate_table)
         predictions.append(item.split(","))
     print(predictions)
-    tmp = []
+    id_predictions = []
     n_labels = len(labels)
     label2id = MulTweEmoDataset.get_label2id()
     for item in predictions:
         pred = [0] * n_labels
         for label in item:
             pred[label2id[label]] = 1
-        tmp.append(pred)
-    print(tmp)
+        id_predictions.append(pred)
+    print(id_predictions)
 
-    # kek = np.array(tmp)
-    # with open(args.output, "wb") as f:
-    #     np.save(f, kek)
+    id_predictions = np.array(id_predictions)
+    with open(args.output, "wb") as f:
+        np.save(f, id_predictions)
