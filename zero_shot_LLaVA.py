@@ -130,15 +130,18 @@ if __name__ == "__main__":
                 raise ValueError("Unsupported image format")
             processed_images.append(image)
         inputs = []
-        for i in range(len(prompts)):
-            inputs.append(processor(images=processed_images[i], text=prompts[i], return_tensors="pt", padding=True).to(device))
+        for sub_prompt in prompts:
+            input_sub_list = []
+            for i in range(len(labels)):
+                input_sub_list.append(processor(images=processed_images[i], text=prompts[i], return_tensors="pt", padding=True).to(device))
+            inputs.append(input_sub_list)
         predictions = np.zeros((len(inputs), len(labels)))
         pattern = re.compile("yes", re.I)
         with torch.no_grad():
             for i in range(len(inputs)):
                 for j in range(len(labels)):
-                    generate_ids = model.generate(**(inputs[i]))
-                    output = processor.decode(generate_ids[0, inputs[i]["input_ids"].shape[1]:], skip_special_tokens=True)
+                    generate_ids = model.generate(**(inputs[i][j]))
+                    output = processor.decode(generate_ids[0, inputs[i][j]["input_ids"].shape[1]:], skip_special_tokens=True)
                     if pattern.match(output):
                         predictions[i][j] = 1
         
