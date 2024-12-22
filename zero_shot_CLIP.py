@@ -18,7 +18,7 @@ if __name__ == "__main__":
     parser.add_argument("-p", "--prompt", type=str, default="This picture evokes")
     args = parser.parse_args()
 
-    feature_extractors = ["base", "jina", "large"]
+    feature_extractors = ["base", "jina", "large", "siglip"]
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -30,7 +30,7 @@ if __name__ == "__main__":
         model = AutoModel.from_pretrained(TweetMSAConfig.get_feature_extractor_name(feature_extractor), trust_remote_code=True)
         model.to(device)
         mode="M"
-        train, _ = MulTweEmoDataset.load(csv_path="./dataset/train_MulTweEmo.csv", mode=mode, drop_something_else=True, force_override=True, test_split=None, seed=123)
+        train, _ = MulTweEmoDataset.load(csv_path="./dataset/test_MulTweEmo.csv", mode=mode, drop_something_else=True, force_override=True, test_split=None, seed=123)
         processed_images= []
         for img in train["img_path"]:
             if isinstance(img, str):

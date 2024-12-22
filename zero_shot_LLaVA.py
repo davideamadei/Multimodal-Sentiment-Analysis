@@ -30,7 +30,7 @@ if __name__ == "__main__":
     model.to(device)
     
     mode="M"
-    train, _ = MulTweEmoDataset.load(csv_path="./dataset/MulTweEmo.csv", mode=mode, drop_something_else=True, force_override=True, test_split=None, seed=123)
+    train, _ = MulTweEmoDataset.load(csv_path="./dataset/test_MulTweEmo.csv", mode=mode, drop_something_else=True, force_override=True, test_split=None, seed=123)
 
     train = train.head(20)
 #    index = 0
