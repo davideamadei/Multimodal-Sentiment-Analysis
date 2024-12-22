@@ -113,6 +113,7 @@ if __name__ == "__main__":
                     inputs = processor(images=img, text=prompt, return_tensors="pt", padding=True).to(device)
                     generate_ids = model.generate(**(inputs))
                     output = processor.decode(generate_ids[0, inputs["input_ids"].shape[1]:], skip_special_tokens=True)
+                    output = output.translate(translate_table)
                     if pos_pattern.match(output):
                         predictions[i][j] = 1
                     elif not neg_pattern.match(output):
