@@ -5,7 +5,6 @@ import pandas as pd
 from PIL import Image
 import requests
 from io import BytesIO
-import torch
 
 # TODO weight initialization
 
@@ -47,7 +46,7 @@ class TweetMSA(PreTrainedModel):
         output_layer.append(nn.Linear(config.n_units, 9))
         self.fc_layers.append(output_layer)
 
-        self.criterion = nn.BCEWithLogitsLoss()
+        self.criterion = nn.BCEWithLogitsLoss(reduction='none')
         
         self.sigmoid = nn.Sigmoid()
 
@@ -76,6 +75,10 @@ class TweetMSA(PreTrainedModel):
 
         if labels is not None :
             loss = self.criterion(logits, labels)
+            if self.config.use_focal_loss:
+                p_t = outputs * labels + (1-outputs) * (1-labels)
+                loss = loss*((1-p_t) ** 2)
+            loss = loss.mean()
             return {"loss": loss, "output": outputs}
         
         return outputs
