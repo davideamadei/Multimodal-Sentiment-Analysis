@@ -12,6 +12,7 @@ if __name__ == "__main__":
     )
     parser.add_argument('-m', '--model', choices=["text", "image", "multimodal"], type=str, default="multimodal", help="type of model on which hp optimization will be performed")
     parser.add_argument('-c', '--clip-version', choices=["base", "large", "jina", "siglip", "blip2"], type=str, default="jina", help='clip version for feature extraction, multimodal only')
+    parser.add_argument("--final_tuning", action="store_true", help="use objective functions for final finetuning")
     parser.add_argument("--freeze_weights", action="store_true", help="freezes weights of feature extractor, multimodal only")
     parser.add_argument("--append_captions", action="store_true", help="append auto-generated captions to tweet, multimodal only")
     parser.add_argument("--data_augment", action="store_true", help="use both normal data and data augmented with captions")
@@ -27,6 +28,8 @@ if __name__ == "__main__":
     model = args.model
     mode = args.mode
     seed = args.seed
+    final_tuning = args.final_tuning
+    data_augment = args.data_augment
 
     if model != "multimodal" and (args.freeze_weights or args.data_augment):
         raise ValueError("--freeze_weights and --data_augment cannot be passed for non multimodal model")
@@ -45,21 +48,37 @@ if __name__ == "__main__":
     
     manual_seed(seed)
     
-    if model == "multimodal":
-        objective = TweetMSAObjective(clip_version=clip, append_captions=args.append_captions, process_emojis=args.process_emojis,
-                                       freeze_weights=args.freeze_weights, seed=seed, mode=mode)
-        study_name = f"{clip}"  # Unique identifier of the study.
-    elif model == "text":
-        objective = BertObjective(append_captions=args.append_captions, process_emojis=args.process_emojis, mode=mode, seed=seed)
-        study_name = "bert"  # Unique identifier of the study.
+    if not final_tuning:
+        if model == "multimodal":
+            objective = TweetMSAObjective(clip_version=clip, append_captions=args.append_captions, process_emojis=args.process_emojis,
+                                        freeze_weights=args.freeze_weights, seed=seed, mode=mode)
+            study_name = f"{clip}"  # Unique identifier of the study.
+        elif model == "text":
+            objective = BertObjective(append_captions=args.append_captions, process_emojis=args.process_emojis, mode=mode, seed=seed)
+            study_name = "bert"  # Unique identifier of the study.
+        else:
+            objective = VitObjective(mode=mode, seed=seed)
+            study_name = "vit"  # Unique identifier of the study.
+        
+        if model != "image" and args.append_captions: study_name += "_append-captions"
+        if model != "image" and args.process_emojis: study_name += "_process_emojis"
+        if model == "multimodal" and args.freeze_weights: study_name += "_freeze-weights"
+        if model == "multimodal" and args.data_augment: study_name += "_data_augment"
+   
     else:
-        objective = VitObjective(mode=mode, seed=seed)
-        study_name = "vit"  # Unique identifier of the study.
+        if model == "multimodal":
+            if data_augment:
+                objective = TweetMSAObjectiveFinal(clip_version=clip, append_captions=args.append_captions, process_emojis=args.process_emojis,
+                                        freeze_weights=args.freeze_weights, seed=seed, mode=mode)
+                study_name = f"{clip}_augment_final"
+            else:
+                objective = TweetMSAObjectiveFinal(clip_version=clip, append_captions=args.append_captions, process_emojis=args.process_emojis,
+                                        freeze_weights=args.freeze_weights, seed=seed, mode=mode)
+                study_name = f"{clip}_final"
+        elif model == "text":
+            objective = BertObjectiveFinal(append_captions=args.append_captions, process_emojis=args.process_emojis, mode=mode, seed=seed)
+            study_name = "bert_final"  # Unique identifier of the study.
     
-    if model != "image" and args.append_captions: study_name += "_append-captions"
-    if model != "image" and args.process_emojis: study_name += "_process_emojis"
-    if model == "multimodal" and args.freeze_weights: study_name += "_freeze-weights"
-    if model == "multimodal" and args.data_augment: study_name += "_data_augment"
     study_name += "_study"
     storage_name = f"sqlite:///{args.study_name}.db"
     
