@@ -11,9 +11,10 @@ class TweetMSAConfig(PretrainedConfig):
         feature_extractor_config: PretrainedConfig = None,
         dropout_p: float = 0.2,
         n_layers: int = 2,
-        n_units:int = 512,
-        weight_initialization:str = "xavier_normal",
-        use_focal_loss:bool = False,
+        n_units: int = 512,
+        weight_initialization: str = "xavier_normal",
+        use_focal_loss: bool = False,
+        text_only: bool = False,
         **kwargs) -> None:
       
       # TODO: clip_large is currently not working
@@ -39,6 +40,8 @@ class TweetMSAConfig(PretrainedConfig):
       self.weight_initialization = weight_initialization
 
       self.use_focal_loss = use_focal_loss
+
+      self.text_only = text_only
 
       super().__init__(**kwargs)
 

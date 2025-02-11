@@ -24,12 +24,17 @@ class TweetMSA(PreTrainedModel):
         self.fc_layers = nn.ModuleList()
 
         input_layer = nn.Sequential()
+
+        n_inputs = 2
+        if self.config.text_only:
+            n_inputs = 1
+
         if self.config.feature_extractor_name_simple == "blip2":
-            input_layer.append(nn.Linear(256*2, config.n_units))
+            input_layer.append(nn.Linear(256*n_inputs, config.n_units))
         elif self.config.feature_extractor_name_simple == "siglip":
-            input_layer.append(nn.Linear(1152*2, config.n_units))
+            input_layer.append(nn.Linear(1152*n_inputs, config.n_units))
         else:
-            input_layer.append(nn.Linear(self.feature_extractor.config.projection_dim*2, config.n_units))
+            input_layer.append(nn.Linear(self.feature_extractor.config.projection_dim*n_inputs, config.n_units))
 
         input_layer.append(nn.Dropout(config.dropout_p))
         input_layer.append(nn.LeakyReLU())
@@ -60,13 +65,18 @@ class TweetMSA(PreTrainedModel):
     def forward(self, input_ids, pixel_values, attention_mask=None, labels=None):
         if self.config.feature_extractor_name_simple != "blip2":
             text_embedding = self.feature_extractor.get_text_features(input_ids=input_ids, attention_mask=attention_mask)
-            image_embedding = self.feature_extractor.get_image_features(pixel_values=pixel_values)
+            if not self.config.text_only:
+                image_embedding = self.feature_extractor.get_image_features(pixel_values=pixel_values)
         else:
             itm_out = self.feature_extractor(input_ids=input_ids, attention_mask=attention_mask, 
                                              pixel_values=pixel_values, use_image_text_matching_head=False, return_dict=True)
             text_embedding = itm_out.text_embeds
             image_embedding = itm_out.image_embeds.mean(dim=1)
-        logits = concatenate((text_embedding, image_embedding), axis=-1)
+
+        if self.config.text_only:
+            logits = text_embedding
+        else:
+            logits = concatenate((text_embedding, image_embedding), axis=-1)
 
         for layer in self.fc_layers:
             logits = layer(logits)
