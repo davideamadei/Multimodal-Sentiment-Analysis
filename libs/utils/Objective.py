@@ -35,13 +35,13 @@ class TweetMSAObjective(object):
             if append_captions:
                 tweet_caption_data = self.train.apply(lambda x: x["tweet"] + " " + x["caption"], axis=1)
                 self.train["tweet"] = tweet_caption_data
-                
+
+        self.val, _ = MulTweEmoDataset.load(csv_path="./dataset/val_MulTweEmo.csv", mode=mode, drop_something_else=True, test_split=None, seed=seed)
+
         if text_only and not append_captions:
             self.train = self.train.drop_duplicates(subset=["id"])
             self.val = self.val.drop_duplicates(subset=["id"])
             self.val = self.val[~self.val.id.isin(self.train.id.values)]
-
-        self.val, _ = MulTweEmoDataset.load(csv_path="./dataset/val_MulTweEmo.csv", mode=mode, drop_something_else=True, test_split=None, seed=seed)
         
         self.train = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=self.train, model=clip_version, text_column="tweet", label_column="labels"))
         self.val = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=self.val, model=clip_version, text_column="tweet", label_column="labels"))
