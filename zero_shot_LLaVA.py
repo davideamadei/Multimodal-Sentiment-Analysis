@@ -9,6 +9,7 @@ import numpy as np
 import argparse
 import regex as re
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         prog='zero shot image classification',
@@ -16,6 +17,8 @@ if __name__ == "__main__":
     )
     parser.add_argument("--seed", type=int, default=123)
     parser.add_argument("-o", "--output", type=str, default="zero-shot-predictions.np")
+    parser.add_argument("-d", "--dataset", type=str, default="./dataset/test_MulTweEmo.csv")
+    parser.add_argument("-p", "--prompt", type=str, default=None)
     parser.add_argument("--binary_prediction", action="store_true", help="predict each label on its own")
     args = parser.parse_args()
 
@@ -32,18 +35,23 @@ if __name__ == "__main__":
     model.to(device)
     
     mode="M"
-    test_data, _ = MulTweEmoDataset.load(csv_path="./dataset/test_MulTweEmo.csv", mode=mode, drop_something_else=True, force_override=True, test_split=None, seed=123)
+    dataset, _ = MulTweEmoDataset.load(csv_path=args.dataset, mode=mode, drop_something_else=True, force_override=True, test_split=None, seed=123)
 
-    predictions = np.zeros((len(test_data), len(labels)))
+    prompt_text = args.prompt
+
+    predictions = np.zeros((len(dataset), len(labels)))
     translate_table = dict.fromkeys(map(ord, '\n[]\' '), None)
     label2id = MulTweEmoDataset.get_label2id()
 
     if not args.binary_prediction:
-        prompt_format = lambda text: f"The image is paired with this text: \"{text}\". Considering both image and text, choose which emotions are most elicited among this list: {labels}. Answer with only the list of chosen emotions."
-
+        if prompt_text is None:
+            prompt_text = """The image is paired with this text: \"{text}\". Considering both image and text, choose which emotions are most elicited among this list: {labels}. Answer with only the list of chosen emotions."""
+        
+        prompt_format = lambda text, labels: prompt_text.format(text=text, lables=labels)
+        
         outputs = []
         with torch.no_grad():
-            for i, row in test_data.iterrows():
+            for i, row in dataset.iterrows():
 
                 conversation = [
                     {
@@ -79,14 +87,18 @@ if __name__ == "__main__":
                         predictions[i][label2id[label]] = 1
 
     else:
-        prompt_format = lambda text, emotion: f"The image is paired with this text: \"{text}\". When looking at both image and text, is the emotion evoked \"{emotion}\"? Answer with Yes or no."
+        
+        if prompt_text is None:
+            prompt_text = """The image is paired with this text: \"{text}\". When looking at both image and text, is the emotion evoked \"{emotion}\"? Answer with Yes or no without giving any further explanation."""
 
-        predictions = np.zeros((len(test_data), len(labels)))
+        prompt_format = lambda text, emotion: prompt_text.format(text=text, emotion=emotion)
+
+        predictions = np.zeros((len(dataset), len(labels)))
         pos_pattern = re.compile("yes", re.I)
         neg_pattern = re.compile("no", re.I)
         error_counter = 0
         with torch.no_grad():    
-            for i, row in test_data.iterrows():
+            for i, row in dataset.iterrows():
                 img = row["img_path"]
                 if isinstance(img, str):
                     if img.startswith('http'):
