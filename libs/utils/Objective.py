@@ -11,7 +11,8 @@ import pandas as pd
 
 
 class TweetMSAObjective(object):
-    def __init__(self, clip_version="jina", append_captions:bool=False, process_emojis:bool=False, data_augment:bool=False, mode="M", freeze_weights:bool=False, seed:int=123):
+    def __init__(self, clip_version="jina", append_captions:bool=False, process_emojis:bool=False, data_augment:bool=False,
+                mode="M", freeze_weights:bool=False, text_only:bool=False, seed:int=123):
         if data_augment:
             train, _ = MulTweEmoDataset.load(csv_path="./dataset/train_MulTweEmo.csv", mode=mode, drop_something_else=True,
                                                 emoji_decoding=process_emojis, test_split=None, seed=seed)
@@ -41,6 +42,7 @@ class TweetMSAObjective(object):
         self.val = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=self.val, model=clip_version, text_column="tweet", label_column="labels"))
         self.clip_version = clip_version
         self.freeze_weights = freeze_weights
+        self.text_only = text_only
 
     def __call__(self, trial):
         n_epochs = trial.suggest_int("n_epochs", 2, 15, log=True)
@@ -55,7 +57,7 @@ class TweetMSAObjective(object):
         dropout = trial.suggest_float("dropout", 0.0, 1.0)
         model = TweetMSAWrapper(n_epochs=n_epochs, warmup_steps=warmup_steps, learning_rate=learning_rate, 
                                  batch_size=batch_size, n_layers=n_layers, n_units=n_units,
-                                 dropout=dropout, clip_version=self.clip_version, freeze_weights=self.freeze_weights)
+                                 dropout=dropout, clip_version=self.clip_version, freeze_weights=self.freeze_weights, text_only=self.text_only)
         model.fit(self.train, self.train["labels"])
         predictions, results =  model.score(self.val, self.val["labels"])
         label_names = MulTweEmoDataset.get_labels()

@@ -12,6 +12,7 @@ if __name__ == "__main__":
     )
     parser.add_argument('-m', '--model', choices=["text", "image", "multimodal"], type=str, default="multimodal", help="type of model on which hp optimization will be performed")
     parser.add_argument('-c', '--clip-version', choices=["base", "large", "jina", "siglip", "blip2"], type=str, default="jina", help='clip version for feature extraction, multimodal only')
+    parser.add_argument('--text_only', action="store_true", help="only valid while using CLIP-like models, gives only text in input")
     parser.add_argument("--final_tuning", action="store_true", help="use objective functions for final finetuning")
     parser.add_argument("--freeze_weights", action="store_true", help="freezes weights of feature extractor, multimodal only")
     parser.add_argument("--append_captions", action="store_true", help="append auto-generated captions to tweet, multimodal only")
@@ -30,9 +31,10 @@ if __name__ == "__main__":
     seed = args.seed
     final_tuning = args.final_tuning
     data_augment = args.data_augment
+    text_only = args.text_only
 
-    if model != "multimodal" and (args.freeze_weights or args.data_augment):
-        raise ValueError("--freeze_weights and --data_augment cannot be passed for non multimodal model")
+    if model != "multimodal" and (args.freeze_weights or args.data_augment or text_only):
+        raise ValueError("--freeze_weights, --data_augment and --text_only cannot be passed for non multimodal model")
     
     if model == "image" and args.append_captions: 
         raise ValueError("--append_captions cannot be passed for image only model")
@@ -51,7 +53,7 @@ if __name__ == "__main__":
     if not final_tuning:
         if model == "multimodal":
             objective = TweetMSAObjective(clip_version=clip, append_captions=args.append_captions, process_emojis=args.process_emojis,
-                                        freeze_weights=args.freeze_weights, seed=seed, mode=mode)
+                                        freeze_weights=args.freeze_weights, text_only=text_only, seed=seed, mode=mode)
             study_name = f"{clip}"  # Unique identifier of the study.
         elif model == "text":
             objective = BertObjective(append_captions=args.append_captions, process_emojis=args.process_emojis, mode=mode, seed=seed)
