@@ -11,24 +11,22 @@ import pandas as pd
 
 
 class TweetMSAObjective(object):
-    def __init__(self, clip_version="jina", append_captions:bool=False, process_emojis:bool=False, data_augment:bool=False,
+    def __init__(self, clip_version="jina", append_captions:bool=False, process_emojis:bool=False, data_augment:bool=False, seed_threshold=0.82,
                 mode="M", freeze_weights:bool=False, text_only:bool=False, seed:int=123):
         if data_augment:
             train, _ = MulTweEmoDataset.load(csv_path="./dataset/train_MulTweEmo.csv", mode=mode, drop_something_else=True,
                                                 emoji_decoding=process_emojis, test_split=None, seed=seed)
-            tweet_caption_data = train.apply(lambda x: x["tweet"] + " " + x["caption"], axis=1)
-
-            # iterate dataset
-            # for each sample select type of duplication and which type
-            # possibly multiple copies for low support labels
-            # silver label augmentation
-            tweet_caption_train = self.train.copy()
-            tweet_caption_train["tweet"] = tweet_caption_data
-            # caption_train = self.train.copy()
-            # caption_train["tweet"] = caption_train["caption"]
-            # self.train = pd.concat(self.train, caption_train)
-            self.train = pd.concat(self.train, tweet_caption_train)
-        
+            silver_train, _ = MulTweEmoDataset.load_silver_dataset(silver_label_mode="threshold",
+                                                                   seed_threshold=seed_threshold,
+                                                                   top_seeds={
+                                                                       "trust":40,
+                                                                       "fear":40,
+                                                                       "surprise":30,
+                                                                       },
+                                                                    csv_path="./dataset/silver_MulTweEmo.csv",
+                                                                    test_split=None,
+                                                                    mode="M")
+            self.train = pd.concat(train, silver_train)
         else:        
             self.train, _ = MulTweEmoDataset.load(csv_path="./dataset/train_MulTweEmo.csv", mode=mode, drop_something_else=True,
                                                 emoji_decoding=process_emojis, test_split=None, seed=seed)
@@ -190,7 +188,7 @@ class VitObjective(object):
         return encoding
 
 
-class TweetMSAObjectiveFinal(object):
+class TweetMSAObjectiveFinal(TweetMSAObjective):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 

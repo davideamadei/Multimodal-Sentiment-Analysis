@@ -12,12 +12,15 @@ if __name__ == "__main__":
     )
     parser.add_argument('-m', '--model', choices=["text", "image", "multimodal"], type=str, default="multimodal", help="type of model on which hp optimization will be performed")
     parser.add_argument('-c', '--clip-version', choices=["base", "large", "jina", "siglip", "blip2"], type=str, default="jina", help='clip version for feature extraction, multimodal only')
+    
     parser.add_argument('--text_only', action="store_true", help="only valid while using CLIP-like models, gives only text in input")
     parser.add_argument("--final_tuning", action="store_true", help="use objective functions for final finetuning")
     parser.add_argument("--freeze_weights", action="store_true", help="freezes weights of feature extractor, multimodal only")
     parser.add_argument("--append_captions", action="store_true", help="append auto-generated captions to tweet, multimodal only")
-    parser.add_argument("--data_augment", action="store_true", help="use both normal data and data augmented with captions")
+    parser.add_argument("--silver_data_augment", action="store_true", help="add silver label only data to training dataset")
+    parser.add_argument("--threshold", type=float, default=0.82, help="threshold for seeds to choose labels in silver label only data. Only used when --silver_data_augment is used")
     parser.add_argument("--process_emojis", action="store_true", help="replace emojis with text representation")
+
     parser.add_argument("-t", "--trials", type=int, default=None, help="number of trials to run, by default continues until killed")
     parser.add_argument("-T", "--timeout", type=int, default=None, help="how long to continue hpyerparameter searching in seconds, by default continues until killed")
     parser.add_argument("-s", "--study_name", type=str, default="MulTweEmo_study", help="name of the file where studies will be saved, cannot be a path")
@@ -30,7 +33,7 @@ if __name__ == "__main__":
     mode = args.mode
     seed = args.seed
     final_tuning = args.final_tuning
-    data_augment = args.data_augment
+    silver_data_augment = args.silver_data_augment
     text_only = args.text_only
 
     if model != "multimodal" and (args.freeze_weights or args.data_augment or text_only):
@@ -53,7 +56,8 @@ if __name__ == "__main__":
     if not final_tuning:
         if model == "multimodal":
             objective = TweetMSAObjective(clip_version=clip, append_captions=args.append_captions, process_emojis=args.process_emojis,
-                                        freeze_weights=args.freeze_weights, text_only=text_only, seed=seed, mode=mode)
+                                        freeze_weights=args.freeze_weights, data_augment=silver_data_augment, seed_threshold=args.threshold, 
+                                        text_only=text_only, seed=seed, mode=mode)
             study_name = f"{clip}"  # Unique identifier of the study.
         elif model == "text":
             objective = BertObjective(append_captions=args.append_captions, process_emojis=args.process_emojis, mode=mode, seed=seed)
@@ -65,13 +69,14 @@ if __name__ == "__main__":
         if model != "image" and args.append_captions: study_name += "_append-captions"
         if model != "image" and args.process_emojis: study_name += "_process_emojis"
         if model == "multimodal" and args.freeze_weights: study_name += "_freeze-weights"
-        if model == "multimodal" and args.data_augment: study_name += "_data_augment"
+        if model == "multimodal" and silver_data_augment: study_name += f"_augment_{args.threshold}"
    
     else:
         if model == "multimodal":
-            if data_augment:
+            if silver_data_augment:
                 objective = TweetMSAObjectiveFinal(clip_version=clip, append_captions=args.append_captions, process_emojis=args.process_emojis,
-                                        freeze_weights=args.freeze_weights, seed=seed, mode=mode)
+                                        freeze_weights=args.freeze_weights, data_augment=silver_data_augment, seed_threshold=args.threshold,
+                                        seed=seed, mode=mode)
                 study_name = f"{clip}_augment_final"
             else:
                 objective = TweetMSAObjectiveFinal(clip_version=clip, append_captions=args.append_captions, process_emojis=args.process_emojis,
