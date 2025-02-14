@@ -2,7 +2,6 @@ import pandas as pd
 import gdown
 from os.path import exists
 from pathlib import PurePath
-from datasets import load_dataset, DatasetDict
 from zipfile import ZipFile
 import re
 from transformers import AutoProcessor, Blip2ForConditionalGeneration
@@ -97,40 +96,12 @@ def _extract_images(files_to_extract: list[str], image_zip_path="./dataset/raw/i
         for info in zfile.infolist():
             if not info.is_dir():
                 info.filename=PurePath(info.filename).name
-                if info.filename in files_to_extract and not exists(f"{image_path}/{info.filename}"):
+                if str(info.filename) in files_to_extract and not exists(f"{image_path}/{info.filename}"):
                     zfile.extract(info, image_path)
-    
-
-def _prepare_dataset(raw_dataset_path="./dataset/raw/MulTweEmo_raw.pkl") -> pd.DataFrame:
-    """utility function to process the raw dataset
-
-    Parameters
-    ----------
-    raw_dataset_path : str, optional
-        path where the raw dataset is located, by default "./dataset/raw/MulTweEmo_raw.pkl"
-
-    Returns
-    -------
-    pd.DataFrame
-        the processed dataset
-    """
-    with open(raw_dataset_path, 'rb') as file:
-        raw_dataset = pd.compat.pickle_compat.load(file)
-
-    raw_dataset = raw_dataset.drop(columns = ["M_gold_multi_label", "T_gold_multi_label"])
-    raw_dataset["img_count"] = raw_dataset["path_photos"].apply(len)
-    
-    labels = raw_dataset.columns[raw_dataset.columns.str.startswith("M_") | raw_dataset.columns.str.startswith("T_")].to_list()
-    columns = ["id", "tweet", "img_count"] + labels
-
-    raw_dataset = raw_dataset[columns]
-
-    raw_dataset = raw_dataset[raw_dataset["M_Anger"].notnull()].copy().reset_index(drop=True)
-    return raw_dataset
-    
+      
 
 def _create_csv(raw_dataset_path="./dataset/raw/MulTweEmo_raw.pkl", csv_path="./dataset/MulTweEmo.csv", 
-                image_path="./dataset/images", image_zip_path="./dataset/raw/images.zip")->None:
+                image_path="./dataset/images")->None:
     """utility function to save the csv file containing the processed dataset
 
     Parameters
@@ -144,7 +115,19 @@ def _create_csv(raw_dataset_path="./dataset/raw/MulTweEmo_raw.pkl", csv_path="./
     image_zip_path : str, optional
         where to save the downloaded zip atchive containing the images, by default "dataset/raw/images.zip"
     """
-    dataset = _prepare_dataset(raw_dataset_path)
+    with open(raw_dataset_path, 'rb') as file:
+        dataset = pd.compat.pickle_compat.load(file)
+
+    dataset = dataset.drop(columns = ["M_gold_multi_label", "T_gold_multi_label"])
+    dataset["img_count"] = dataset["path_photos"].apply(len)
+    
+    labels = dataset.columns[dataset.columns.str.startswith("M_") | dataset.columns.str.startswith("T_")].to_list()
+    columns = ["id", "tweet", "img_count"] + labels
+
+    dataset = dataset[columns]
+
+    dataset = dataset[dataset["M_Anger"].notnull()].copy().reset_index(drop=True)
+
     labels = dataset.columns[dataset.columns.str.startswith("M_") | dataset.columns.str.startswith("T_")].to_list()
     for label in labels:
         dataset[label] = dataset[label].apply(lambda x: 1 if x>=2 else 0)
@@ -154,7 +137,6 @@ def _create_csv(raw_dataset_path="./dataset/raw/MulTweEmo_raw.pkl", csv_path="./
     dataset["img_name"] = dataset.apply(lambda x : f"{x['id']}_{x['img_name']}.jpg", axis=1)
     columns = ["id", "tweet", "img_name"] + labels
 
-    _extract_images(image_zip_path=image_zip_path, image_path=image_path, files_to_extract=dataset["img_name"].to_list())
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     processor = AutoProcessor.from_pretrained("Salesforce/blip2-opt-2.7b")
@@ -178,7 +160,7 @@ def _create_csv(raw_dataset_path="./dataset/raw/MulTweEmo_raw.pkl", csv_path="./
 def load(mode:str="M", raw_dataset_path:str="./dataset/raw/MulTweEmo_raw.pkl", csv_path:str="./dataset/MulTweEmo.csv", 
         image_path:str="./dataset/images", image_zip_path:str="./dataset/raw/images.zip",
         force_override=False, preprocess_tweets=True, emoji_decoding=False, build_label_matrix=True, drop_something_else=True,
-        create_dataset=False, test_split:float=0.2, seed:int=None)->tuple[pd.DataFrame]:
+        create_dataset=False, test_split:float=None, seed:int=None)->tuple[pd.DataFrame]:
         
     """function to load the MulTweEmo dataset, downloads dataset if not cached. The processed dataset for further uses is also saved as a csv
 
@@ -233,7 +215,7 @@ def load(mode:str="M", raw_dataset_path:str="./dataset/raw/MulTweEmo_raw.pkl", c
     if create_dataset:
         if not exists(raw_dataset_path) or force_override:
             _download_dataset(raw_dataset_path=raw_dataset_path, image_zip_path=image_zip_path, csv_path=csv_path, create_dataset=create_dataset)
-            _create_csv(raw_dataset_path=raw_dataset_path, csv_path=csv_path, image_path=image_path, image_zip_path=image_zip_path)
+            _create_csv(raw_dataset_path=raw_dataset_path, csv_path=csv_path, image_path=image_path)
     else:
         if not exists(csv_path):
             _download_dataset(raw_dataset_path=raw_dataset_path, image_zip_path=image_zip_path, csv_path=csv_path, create_dataset=create_dataset)
@@ -242,7 +224,7 @@ def load(mode:str="M", raw_dataset_path:str="./dataset/raw/MulTweEmo_raw.pkl", c
 
     # extract images from the zip file
     # skips already existing files
-    _extract_images(image_zip_path=image_zip_path, image_path=image_path, files_to_extract=dataset["img_name"])
+    _extract_images(image_zip_path=image_zip_path, image_path=image_path, files_to_extract=dataset["img_name"].to_list())
 
     # drop the labels for the mode which was not selected    
     features = dataset.columns.to_list()
@@ -295,7 +277,90 @@ def load(mode:str="M", raw_dataset_path:str="./dataset/raw/MulTweEmo_raw.pkl", c
     return (dataset, None)
     # return dataset.train_test_split(test_size=test_split, seed=seed, shuffle=True)
 
-# TODO potentially handle emoji, urls, mentions with substitution instead of removal
+
+def load_silver_dataset(raw_dataset_path="./dataset/MulTweEmo_raw.pkl",
+                        csv_path="./dataset/silver_MulTweEmo.csv",  
+                        silver_label_mode="label",
+                        label_name="multi_label",
+                        seed_threshold=0.81,
+                        top_seeds:(int|dict)=None,
+                        **kwargs):
+        
+    if silver_label_mode != "threshold" and silver_label_mode != "label":
+        raise ValueError("mode must be chosen between \"top\", \"threhsold\" or \"label\"")
+
+    with open(raw_dataset_path, 'rb') as file:
+        dataset = pd.compat.pickle_compat.load(file)
+
+    dataset = dataset[dataset["M_Anger"].isnull()].copy().reset_index(drop=True)
+    
+    dataset = dataset.drop(columns = ["M_gold_multi_label", "T_gold_multi_label"])
+    dataset["img_count"] = dataset["path_photos"].apply(len)
+
+    labels = get_labels(drop_something_else=False)
+
+    emotions_m = {emotion: "M_"+emotion.capitalize() for emotion in labels}
+    emotions_t = {emotion: "T_"+emotion.capitalize() for emotion in labels}
+    
+    label_columns = list(emotions_m.values()) + list(emotions_t.values())
+    columns = ["id", "tweet", "img_count"] + label_columns
+
+    dataset[label_columns] = 0
+
+    if silver_label_mode=="label":
+        columns
+        def set_labels(row):
+            if label_name == "multi_label":
+                for label in row[label_name]:
+                    row[emotions_m[label]] = 1
+                    row[emotions_t[label]] = 1
+            elif label_name == "uni_label":
+                label = row[label_name]
+                row[emotions_m[label]] = 1
+                row[emotions_t[label]] = 1
+            else:
+                raise ValueError()
+            return row
+    else:
+        def set_labels(row):
+            for e, d in row["seeds"].items():
+                avg = sum(d.values())/len(d.values())
+                if avg > seed_threshold:
+                    row[emotions_m[e]] = 1
+                    row[emotions_t[e]] = 1
+            return row
+        
+    def seeds_avg(row):
+        avgs = {}
+        for e, d in row["seeds"].items():
+            avgs[e] = sum(d.values())/len(d.values())
+        row["avg_seeds"] = avgs
+        return row
+    
+    dataset = dataset.apply(set_labels, axis=1)
+
+    if top_seeds != None:
+        dataset = dataset.apply(seeds_avg, axis=1)
+        labels.remove("neutral")
+        labels.remove("something else")
+        indices = []
+        if type(top_seeds) == int:
+            for label in labels:
+                indices += pd.DataFrame(dataset["avg_seeds"].to_list()).sort_values(by=label, ascending=False).head(top_seeds).index.to_list()
+        else:
+            for label, top_n in top_seeds.items():
+                indices += pd.DataFrame(dataset["avg_seeds"].to_list()).sort_values(by=label, ascending=False).head(top_n).index.to_list()
+        dataset = dataset.iloc[indices].sort_index().drop_duplicates(subset="id")
+    dataset = dataset[columns]
+    
+    dataset["img_name"] = dataset["img_count"].apply(lambda x : range(x))
+    dataset = dataset.explode("img_name")
+    dataset["img_name"] = dataset.apply(lambda x : f"{x['id']}_{x['img_name']}.jpg", axis=1)
+    dataset.to_csv(csv_path, index=False, mode="w+")
+    
+    return load(csv_path=csv_path, **kwargs)
+
+
 def _preprocess_tweet(input: dict, emoji_decoding:bool):
     tweet = input["tweet"]
 
