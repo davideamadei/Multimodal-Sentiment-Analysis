@@ -303,7 +303,7 @@ def load_silver_dataset(raw_dataset_path="./dataset/MulTweEmo_raw.pkl",
     emotions_t = {emotion: "T_"+emotion.capitalize() for emotion in labels}
     
     label_columns = list(emotions_m.values()) + list(emotions_t.values())
-    columns = ["id", "tweet", "img_count"] + label_columns
+    columns = ["id", "tweet"] + label_columns
 
     dataset[label_columns] = 0
 
