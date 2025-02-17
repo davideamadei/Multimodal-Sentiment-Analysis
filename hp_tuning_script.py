@@ -36,7 +36,7 @@ if __name__ == "__main__":
     silver_data_augment = args.silver_data_augment
     text_only = args.text_only
 
-    if model != "multimodal" and (args.freeze_weights or args.data_augment or text_only):
+    if model != "multimodal" and (args.freeze_weights or args.silver_data_augment or text_only):
         raise ValueError("--freeze_weights, --data_augment and --text_only cannot be passed for non multimodal model")
     
     if model == "image" and args.append_captions: 
