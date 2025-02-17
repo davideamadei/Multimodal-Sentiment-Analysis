@@ -38,7 +38,7 @@ if __name__ == "__main__":
     dataset, _ = MulTweEmoDataset.load(csv_path=args.dataset, mode=mode, drop_something_else=True, force_override=True, test_split=None, seed=123)
 
     prompt_text = args.prompt
-
+    
     predictions = np.zeros((len(dataset), len(labels)))
     translate_table = dict.fromkeys(map(ord, '\n[]\' '), None)
     label2id = MulTweEmoDataset.get_label2id()
@@ -47,7 +47,7 @@ if __name__ == "__main__":
         if prompt_text is None:
             prompt_text = """The image is paired with this text: \"{text}\". Considering both image and text, choose which emotions are most elicited among this list: {labels}. Answer with only the list of chosen emotions."""
         
-        prompt_format = lambda text, labels: prompt_text.format(text=text, lables=labels)
+        prompt_format = lambda text, labels: prompt_text.format(text=text, labels=labels)
         
         outputs = []
         with torch.no_grad():
