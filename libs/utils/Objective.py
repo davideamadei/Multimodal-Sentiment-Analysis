@@ -26,7 +26,7 @@ class TweetMSAObjective(object):
                                                                     csv_path="./dataset/silver_MulTweEmo.csv",
                                                                     test_split=None,
                                                                     mode="M")
-            self.train = pd.concat(train, silver_train)
+            self.train = pd.concat([train, silver_train])
         else:        
             self.train, _ = MulTweEmoDataset.load(csv_path="./dataset/train_MulTweEmo.csv", mode=mode, drop_something_else=True,
                                                 emoji_decoding=process_emojis, test_split=None, seed=seed)
@@ -46,6 +46,7 @@ class TweetMSAObjective(object):
         self.clip_version = clip_version
         self.freeze_weights = freeze_weights
         self.text_only = text_only
+        self.data_augment = data_augment
 
     def __call__(self, trial):
         n_epochs = trial.suggest_int("n_epochs", 2, 15, log=True)
@@ -193,16 +194,26 @@ class TweetMSAObjectiveFinal(TweetMSAObjective):
         super().__init__(*args, **kwargs)
 
     def __call__(self, trial):
-        n_epochs = trial.suggest_int("n_epochs", 2, 15, log=True)
-        learning_rate = trial.suggest_float("learning_rate", 1e-5, 1e-2, log=True)
-        warmup_steps = trial.suggest_int("warmup_steps", 0, 200, step=10)
-        if self.clip_version == "siglip" or self.clip_version == "blip2":
-            batch_size = 8
+        if self.data_augment:
+            n_epochs = trial.suggest_int("n_epochs", 2, 15, log=True)
+            learning_rate = trial.suggest_float("learning_rate", 1e-5, 1e-2, log=True)
+            warmup_steps = trial.suggest_int("warmup_steps", 0, 200, step=10)
+            if self.clip_version == "siglip" or self.clip_version == "blip2":
+                batch_size = 8
+            else:
+                batch_size = trial.suggest_categorical("batch_size", [8,16,32])
+            n_layers = trial.suggest_int("n_layers", 1, 10)
+            n_units = trial.suggest_int("n_units", 32, 1024, log=True)
+            dropout = trial.suggest_float("dropout", 0.0, 0.5)
         else:
-            batch_size = trial.suggest_categorical("batch_size", [8,16,32])
-        n_layers = trial.suggest_int("n_layers", 1, 10)
-        n_units = trial.suggest_int("n_units", 32, 1024, log=True)
-        dropout = trial.suggest_float("dropout", 0.0, 1.0)
+            n_epochs = trial.suggest_int("n_epochs", 5, 15)
+            learning_rate = trial.suggest_float("learning_rate", 1e-5, 5e-4, log=True)
+            warmup_steps = trial.suggest_int("warmup_steps", 0, 200, step=10)
+            batch_size = 16
+            n_layers = trial.suggest_int("n_layers", 1, 10)
+            n_units = trial.suggest_int("n_units", 32, 768, log=True)
+            dropout = trial.suggest_float("dropout", 0.0, 0.5)
+
         model = TweetMSAWrapper(n_epochs=n_epochs, warmup_steps=warmup_steps, learning_rate=learning_rate, 
                                  batch_size=batch_size, n_layers=n_layers, n_units=n_units,
                                  dropout=dropout, clip_version=self.clip_version, freeze_weights=self.freeze_weights)
@@ -224,10 +235,9 @@ class BertObjectiveFinal(BertObjective):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-
     def __call__(self, trial):
-        n_epochs = trial.suggest_int("n_epochs", 2, 15, log=True)
-        learning_rate = trial.suggest_float("learning_rate", 1e-5, 1e-2, log=True)
+        n_epochs = trial.suggest_int("n_epochs", 6, 15, log=True)
+        learning_rate = trial.suggest_float("learning_rate", 1e-5, 5e-4, log=True)
         warmup_steps = trial.suggest_int("warmup_steps", 0, 200, step=10)
         batch_size = trial.suggest_categorical("batch_size", [8,16,32])
 
