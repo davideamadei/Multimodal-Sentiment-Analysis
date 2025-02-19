@@ -23,8 +23,8 @@ class CustomWrapper(ABC, BaseEstimator):
         self._is_fitted = True
         return self
 
-    def fit(self, train, labels, val=None, ckp_dir=None):
-        self._create_model(train, val, ckp_dir=ckp_dir)
+    def fit(self, train, labels, val=None, ckp_dir=None, compute_metrics=None):
+        self._create_model(train, val, ckp_dir=ckp_dir, compute_metrics=compute_metrics)
         self._trainer.train(resume_from_checkpoint=ckp_dir)
         self._is_fitted = True
         return self
@@ -78,7 +78,7 @@ class TweetMSAWrapper(CustomWrapper):
         self.run_name = run_name
         self.seed = seed
 
-    def _create_model(self, train, val=None, ckp_dir=None):
+    def _create_model(self, train, val=None, ckp_dir=None, compute_metrics=None):
         config = TweetMSAConfig(
             feature_extractor=self.clip_version,
             layers=self.n_layers,
@@ -134,6 +134,7 @@ class TweetMSAWrapper(CustomWrapper):
             eval_dataset=val,
             args=args,
             tokenizer=None,
+            compute_metrics=compute_metrics
             )
         self._trainer = trainer
 
@@ -154,7 +155,7 @@ class BertWrapper(CustomWrapper):
         self.run_name = run_name
         self.seed = seed
 
-    def _create_model(self, train, val=None, ckp_dir=None):
+    def _create_model(self, train, val=None, ckp_dir=None, compute_metrics=None):
         if ckp_dir:
             model = AutoModelForSequenceClassification.from_pretrained(ckp_dir).cuda()
         else:
@@ -202,6 +203,7 @@ class BertWrapper(CustomWrapper):
             eval_dataset=val,
             args=args,
             tokenizer=None,
+            compute_metrics=compute_metrics
             )
         self._trainer = trainer
 
@@ -222,7 +224,7 @@ class VitWrapper(CustomWrapper):
         self.run_name = run_name
         self.seed = seed
 
-    def _create_model(self, train, val=None, ckp_dir=None):
+    def _create_model(self, train, val=None, ckp_dir=None, compute_metrics=None):
         if ckp_dir:
             model = AutoModelForImageClassification.from_pretrained(ckp_dir).cuda()
         else:
@@ -272,5 +274,6 @@ class VitWrapper(CustomWrapper):
             eval_dataset=val,
             args=args,
             tokenizer=None,
+            compute_metrics=compute_metrics
             )
         self._trainer = trainer
