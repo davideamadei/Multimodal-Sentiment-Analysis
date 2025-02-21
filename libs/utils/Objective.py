@@ -195,15 +195,12 @@ class TweetMSAObjectiveFinal(TweetMSAObjective):
 
     def __call__(self, trial):
         if self.data_augment:
-            n_epochs = trial.suggest_int("n_epochs", 2, 15, log=True)
-            learning_rate = trial.suggest_float("learning_rate", 1e-5, 1e-2, log=True)
+            n_epochs = trial.suggest_int("n_epochs", 5, 10)
+            learning_rate = trial.suggest_float("learning_rate", 1e-5, 5e-4, log=True)
             warmup_steps = trial.suggest_int("warmup_steps", 0, 200, step=10)
-            if self.clip_version == "siglip" or self.clip_version == "blip2":
-                batch_size = 8
-            else:
-                batch_size = trial.suggest_categorical("batch_size", [8,16,32])
-            n_layers = trial.suggest_int("n_layers", 1, 10)
-            n_units = trial.suggest_int("n_units", 32, 1024, log=True)
+            batch_size = trial.suggest_categorical("batch_size", [8,16,32])
+            n_layers = trial.suggest_int("n_layers", 3, 10)
+            n_units = trial.suggest_int("n_units", 32, 768, log=True)
             dropout = trial.suggest_float("dropout", 0.0, 0.5)
         else:
             n_epochs = trial.suggest_int("n_epochs", 5, 15)
