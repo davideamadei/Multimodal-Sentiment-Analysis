@@ -1,13 +1,11 @@
 from abc import ABC, abstractmethod
 from libs.model import TweetMSA, TweetMSAConfig
-from torch import manual_seed
 from transformers import Trainer, TrainingArguments, AutoModelForImageClassification, AutoModelForSequenceClassification
 from sklearn.base import BaseEstimator
 from sklearn.utils.validation import check_is_fitted
 import sklearn.metrics as skm
-from datasets import Dataset
-import torch
-
+import math
+import numpy as np
 
 class CustomWrapper(ABC, BaseEstimator):
             
@@ -106,7 +104,7 @@ class TweetMSAWrapper(CustomWrapper):
             eval_strategy="no" if not val else "epoch", 
             logging_strategy="no" if not self.output_dir else "steps",
             
-            save_total_limit=5,
+            save_total_limit=10,
             logging_steps=1,
 
             output_dir=output_dir,
@@ -155,6 +153,23 @@ class BertWrapper(CustomWrapper):
         self.run_name = run_name
         self.seed = seed
 
+    @staticmethod
+    def _sigmoid(x):
+        return 1 / (1 + math.exp(-x))
+    
+    def score(self, X, y):
+        check_is_fitted(self)
+        preds=self.predict(X)
+        y_pred = np.vectorize(self._sigmoid)(preds.predictions) > 0.5
+        metrics_dict = {}
+
+        metrics_dict["loss"] = preds.metrics["test_loss"]
+        metrics_dict["exact_match"] = skm.accuracy_score(y, y_pred, normalize=True, sample_weight=None)
+        metrics_dict["recall"] = skm.recall_score(y_true=y, y_pred=y_pred, average='samples', zero_division=0)
+        metrics_dict["precision"] = skm.precision_score(y_true=y, y_pred=y_pred, average='samples', zero_division=0)
+        metrics_dict["f1_score"] = skm.f1_score(y_true=y, y_pred=y_pred, average='samples', zero_division=0)
+        return y_pred, metrics_dict
+    
     def _create_model(self, train, val=None, ckp_dir=None, compute_metrics=None):
         if ckp_dir:
             model = AutoModelForSequenceClassification.from_pretrained(ckp_dir).cuda()
@@ -175,7 +190,7 @@ class BertWrapper(CustomWrapper):
             eval_strategy="no" if not val else "epoch", 
             logging_strategy="no" if not self.output_dir else "steps",
             
-            save_total_limit=5,
+            save_total_limit=10,
             logging_steps=1,
 
             output_dir=output_dir,
@@ -224,6 +239,23 @@ class VitWrapper(CustomWrapper):
         self.run_name = run_name
         self.seed = seed
 
+    @staticmethod
+    def _sigmoid(x):
+        return 1 / (1 + math.exp(-x))
+    
+    def score(self, X, y):
+        check_is_fitted(self)
+        preds=self.predict(X)
+        y_pred = np.vectorize(self._sigmoid)(preds.predictions) > 0.5
+        metrics_dict = {}
+
+        metrics_dict["loss"] = preds.metrics["test_loss"]
+        metrics_dict["exact_match"] = skm.accuracy_score(y, y_pred, normalize=True, sample_weight=None)
+        metrics_dict["recall"] = skm.recall_score(y_true=y, y_pred=y_pred, average='samples', zero_division=0)
+        metrics_dict["precision"] = skm.precision_score(y_true=y, y_pred=y_pred, average='samples', zero_division=0)
+        metrics_dict["f1_score"] = skm.f1_score(y_true=y, y_pred=y_pred, average='samples', zero_division=0)
+        return y_pred, metrics_dict
+    
     def _create_model(self, train, val=None, ckp_dir=None, compute_metrics=None):
         if ckp_dir:
             model = AutoModelForImageClassification.from_pretrained(ckp_dir).cuda()
@@ -246,7 +278,7 @@ class VitWrapper(CustomWrapper):
             eval_strategy="no" if not val else "epoch", 
             logging_strategy="no" if not self.output_dir else "steps",
             
-            save_total_limit=5,
+            save_total_limit=10,
             logging_steps=1,
 
             output_dir=output_dir,
