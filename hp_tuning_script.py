@@ -74,10 +74,12 @@ if __name__ == "__main__":
     else:
         if model == "multimodal":
             if silver_data_augment:
-                objective = TweetMSAObjectiveFinal(clip_version=clip, append_captions=args.append_captions, process_emojis=args.process_emojis,
-                                        freeze_weights=args.freeze_weights, data_augment=silver_data_augment, seed_threshold=args.threshold,
-                                        seed=seed, mode=mode)
+                objective = TweetMSAObjectiveFinal(clip_version=clip, data_augment=True,
+                                                   seed_threshold=args.threshold, seed=seed, mode=mode)
                 study_name = f"{clip}_augment_final"
+            elif args.append_captions:
+                objective = TweetMSAObjectiveFinal(clip_version=clip, append_captions=args.append_captions, seed=seed, mode=mode)
+                study_name = f"{clip}_captions_final"
             else:
                 objective = TweetMSAObjectiveFinal(clip_version=clip, append_captions=args.append_captions, process_emojis=args.process_emojis,
                                         freeze_weights=args.freeze_weights, seed=seed, mode=mode)
