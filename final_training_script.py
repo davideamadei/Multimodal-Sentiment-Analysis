@@ -25,9 +25,10 @@ if __name__ == "__main__":
         prog='train_msa',
         description='Train MSA model',
     )
-    parser.add_argument('-m', '--model', choices=["bert", "base", "base_augment"], type=str, default="base", help="the model to train")
+    parser.add_argument('-m', '--model', choices=["bert", "base", "base_captions", "base_augment"], type=str, default="base", help="the model to train")
     
     parser.add_argument("--seed", type=int, default=123)
+
     args = parser.parse_args()
     
     model_type = args.model
@@ -61,37 +62,53 @@ if __name__ == "__main__":
         train = train.map(_preprocess_data, batched=True, remove_columns=[col for col in train.column_names if col != "labels"])
         val = val.map(_preprocess_data, batched=True, remove_columns=[col for col in val.column_names if col != "labels"])
 
-        # model = BertWrapper(n_epochs=11,
-        #                     batch_size=16,
-        #                     warmup_steps=20,
-        #                     learning_rate=4.259470947149478e-05,
-        #                     output_dir=model_type,
-        #                     run_name=model_type,
-        #                     seed=seed
-        #                     )
-
-        model = BertWrapper(n_epochs=12,
-                            batch_size=32,
-                            warmup_steps=130,
-                            learning_rate=2.3276750829784812e-05,
+        model = BertWrapper(n_epochs=11,
+                            batch_size=16,
+                            warmup_steps=20,
+                            learning_rate=4.259470947149478e-05,
                             output_dir=model_type,
                             run_name=model_type,
                             seed=seed
                             )
+
         
     elif model_type == "base":
         train = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=train, model="base", text_column="tweet", label_column="labels"))
         val = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=val, model="base", text_column="tweet", label_column="labels"))
 
         model = TweetMSAWrapper(clip_version="base",
-                                n_epochs=11,
+                                n_epochs=14,
                                 batch_size=16,
-                                warmup_steps=20,
-                                learning_rate=4.259470947149478e-05,
+                                warmup_steps=150,
+                                learning_rate=1.6856413214253974e-05,
+                                n_layers=1,
+                                n_units=66,
+                                dropout=0.3240428275567533,
+                                output_dir=model_type,
+                                run_name=model_type,
+                                seed=seed
+                                )    
+            
+    elif model_type == "base_captions":
+        train = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=train, model="base", text_column="tweet", label_column="labels"))
+        val = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=val, model="base", text_column="tweet", label_column="labels"))
+       
+        tweet_caption_data = train.apply(lambda x: x["tweet"] + " " + x["caption"], axis=1)
+        train["tweet"] = tweet_caption_data 
+        
+        model = TweetMSAWrapper(clip_version="base",
+                                n_epochs=14,
+                                batch_size=16,
+                                warmup_steps=150,
+                                learning_rate=1.6856413214253974e-05,
+                                n_layers=1,
+                                n_units=66,
+                                dropout=0.2,
                                 output_dir=model_type,
                                 run_name=model_type,
                                 seed=seed
                                 )
+        
     else:
         silver_train = MulTweEmoDataset.load_silver_dataset(silver_label_mode="threshold",
                                                             seed_threshold=0.82,
@@ -110,10 +127,13 @@ if __name__ == "__main__":
         val = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=val, model="base", text_column="tweet", label_column="labels"))
 
         model = TweetMSAWrapper(clip_version="base",
-                                n_epochs=11,
-                                batch_size=16,
-                                warmup_steps=20,
-                                learning_rate=4.259470947149478e-05,
+                                n_epochs=6,
+                                batch_size=8,
+                                warmup_steps=50,
+                                learning_rate=2.8626493397033086e-05,
+                                n_layers=1,
+                                n_units=199,
+                                dropout=0.2443714062077184,
                                 output_dir=model_type,
                                 run_name=model_type,
                                 seed=seed
