@@ -16,6 +16,10 @@ class TweetMSAObjective(object):
         if data_augment:
             train, _ = MulTweEmoDataset.load(csv_path="./dataset/train_MulTweEmo.csv", mode=mode, drop_something_else=True,
                                                 emoji_decoding=process_emojis, test_split=None, seed=seed)
+            if append_captions:
+                tweet_caption_data = train.apply(lambda x: x["tweet"] + " " + x["caption"], axis=1)
+                train["tweet"] = tweet_caption_data
+
             silver_train, _ = MulTweEmoDataset.load_silver_dataset(silver_label_mode="threshold",
                                                                    seed_threshold=seed_threshold,
                                                                    top_seeds={
@@ -47,6 +51,7 @@ class TweetMSAObjective(object):
         self.freeze_weights = freeze_weights
         self.text_only = text_only
         self.data_augment = data_augment
+        self.append_captions = append_captions
 
     def __call__(self, trial):
         n_epochs = trial.suggest_int("n_epochs", 2, 15, log=True)
@@ -194,7 +199,16 @@ class TweetMSAObjectiveFinal(TweetMSAObjective):
         super().__init__(*args, **kwargs)
 
     def __call__(self, trial):
-        if self.data_augment:
+        if self.append_captions:
+            n_epochs = trial.suggest_int("n_epochs", 5, 15)
+            learning_rate = trial.suggest_float("learning_rate", 1e-5, 5e-4, log=True)
+            warmup_steps = trial.suggest_int("warmup_steps", 0, 200, step=10)
+            batch_size = 16
+            n_layers = trial.suggest_int("n_layers", 1, 10)
+            n_units = trial.suggest_int("n_units", 128, 1024)
+            dropout = trial.suggest_float("dropout", 0.0, 0.5)
+
+        elif self.data_augment:
             n_epochs = trial.suggest_int("n_epochs", 5, 10)
             learning_rate = trial.suggest_float("learning_rate", 1e-5, 5e-4, log=True)
             warmup_steps = trial.suggest_int("warmup_steps", 0, 200, step=10)
@@ -202,6 +216,7 @@ class TweetMSAObjectiveFinal(TweetMSAObjective):
             n_layers = trial.suggest_int("n_layers", 3, 10)
             n_units = trial.suggest_int("n_units", 32, 768, log=True)
             dropout = trial.suggest_float("dropout", 0.0, 0.5)
+
         else:
             n_epochs = trial.suggest_int("n_epochs", 5, 15)
             learning_rate = trial.suggest_float("learning_rate", 1e-5, 5e-4, log=True)
