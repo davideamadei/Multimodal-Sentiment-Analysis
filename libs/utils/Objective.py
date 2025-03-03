@@ -223,7 +223,7 @@ class TweetMSAObjectiveFinal(TweetMSAObjective):
             dropout = trial.suggest_float("dropout", 0.0, 0.5)
 
         else:
-            n_epochs = 1
+            n_epochs = trial.suggest_int("n_epochs", 5, 15)
             learning_rate = trial.suggest_float("learning_rate", 1e-5, 5e-4, log=True)
             warmup_steps = trial.suggest_int("warmup_steps", 0, 200, step=10)
             batch_size = 16
