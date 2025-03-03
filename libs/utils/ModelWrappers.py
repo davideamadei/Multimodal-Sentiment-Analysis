@@ -6,6 +6,7 @@ from sklearn.utils.validation import check_is_fitted
 import sklearn.metrics as skm
 import math
 import numpy as np
+import torch
 
 class CustomWrapper(ABC, BaseEstimator):
             
@@ -132,7 +133,7 @@ class TweetMSAWrapper(CustomWrapper):
             eval_dataset=val,
             args=args,
             tokenizer=None,
-            compute_metrics=compute_metrics
+            compute_metrics=compute_metrics,
             )
         self._trainer = trainer
 
@@ -174,6 +175,7 @@ class BertWrapper(CustomWrapper):
         if ckp_dir:
             model = AutoModelForSequenceClassification.from_pretrained(ckp_dir).cuda()
         else:
+            # torch.manual_seed(self.seed)
             model = AutoModelForSequenceClassification.from_pretrained(self.bert_version, 
                                                         problem_type="multi_label_classification", 
                                                         num_labels=len(train["labels"][0]))
@@ -186,7 +188,8 @@ class BertWrapper(CustomWrapper):
             report_to="none" if not self.run_name else "wandb",
             run_name=self.run_name,
             resume_from_checkpoint=False if not ckp_dir else self.output_dir,
-            save_strategy="no" if not self.output_dir else "epoch", 
+            save_strategy="no",
+            # save_strategy="no" if not self.output_dir else "epoch", 
             eval_strategy="no" if not val else "epoch", 
             logging_strategy="no" if not self.output_dir else "steps",
             

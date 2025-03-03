@@ -8,7 +8,7 @@ import requests
 from PIL import Image
 from io import BytesIO
 import pandas as pd
-
+import torch
 
 class TweetMSAObjective(object):
     def __init__(self, clip_version="jina", append_captions:bool=False, process_emojis:bool=False, data_augment:bool=False, seed_threshold=0.82,
@@ -52,6 +52,7 @@ class TweetMSAObjective(object):
         self.text_only = text_only
         self.data_augment = data_augment
         self.append_captions = append_captions
+        self.seed = seed
 
     def __call__(self, trial):
         n_epochs = trial.suggest_int("n_epochs", 2, 15, log=True)
@@ -64,6 +65,7 @@ class TweetMSAObjective(object):
         n_layers = trial.suggest_int("n_layers", 1, 10)
         n_units = trial.suggest_int("n_units", 32, 1024, log=True)
         dropout = trial.suggest_float("dropout", 0.0, 1.0)
+        torch.manual_seed(self.seed)
         model = TweetMSAWrapper(n_epochs=n_epochs, warmup_steps=warmup_steps, learning_rate=learning_rate, 
                                  batch_size=batch_size, n_layers=n_layers, n_units=n_units,
                                  dropout=dropout, clip_version=self.clip_version, freeze_weights=self.freeze_weights, text_only=self.text_only)
@@ -104,6 +106,7 @@ class BertObjective(object):
         self.train = self.train.map(self._preprocess_data, batched=True, remove_columns=[col for col in self.train.column_names if col != "labels"])
         
         self.val = self.val.map(self._preprocess_data, batched=True, remove_columns=[col for col in self.val.column_names if col != "labels"])
+        self.seed = seed
 
 
     def __call__(self, trial):
@@ -112,6 +115,7 @@ class BertObjective(object):
         warmup_steps = trial.suggest_int("warmup_steps", 0, 200, step=10)
         batch_size = trial.suggest_categorical("batch_size", [8,16,32])
 
+        torch.manual_seed(self.seed)
         model = BertWrapper(n_epochs=n_epochs, warmup_steps=warmup_steps, learning_rate=learning_rate, batch_size=batch_size)
         
         model.fit(self.train, self.train["labels"])
@@ -157,6 +161,7 @@ class VitObjective(object):
         warmup_steps = trial.suggest_int("warmup_steps", 0, 200, step=10)
         batch_size = trial.suggest_categorical("batch_size", [8,16,32])
 
+        torch.manual_seed(self.seed)
         model = VitWrapper(n_epochs=n_epochs, warmup_steps=warmup_steps, learning_rate=learning_rate, batch_size=batch_size)
         
         model.fit(self.train, self.train["labels"])
@@ -218,7 +223,7 @@ class TweetMSAObjectiveFinal(TweetMSAObjective):
             dropout = trial.suggest_float("dropout", 0.0, 0.5)
 
         else:
-            n_epochs = trial.suggest_int("n_epochs", 5, 15)
+            n_epochs = 1
             learning_rate = trial.suggest_float("learning_rate", 1e-5, 5e-4, log=True)
             warmup_steps = trial.suggest_int("warmup_steps", 0, 200, step=10)
             batch_size = 16
@@ -226,6 +231,7 @@ class TweetMSAObjectiveFinal(TweetMSAObjective):
             n_units = trial.suggest_int("n_units", 32, 768, log=True)
             dropout = trial.suggest_float("dropout", 0.0, 0.5)
 
+        torch.manual_seed(self.seed)
         model = TweetMSAWrapper(n_epochs=n_epochs, warmup_steps=warmup_steps, learning_rate=learning_rate, 
                                  batch_size=batch_size, n_layers=n_layers, n_units=n_units,
                                  dropout=dropout, clip_version=self.clip_version, freeze_weights=self.freeze_weights)
@@ -253,6 +259,7 @@ class BertObjectiveFinal(BertObjective):
         warmup_steps = trial.suggest_int("warmup_steps", 0, 200, step=10)
         batch_size = trial.suggest_categorical("batch_size", [8,16,32])
 
+        torch.manual_seed(self.seed)
         model = BertWrapper(n_epochs=n_epochs, warmup_steps=warmup_steps, learning_rate=learning_rate, batch_size=batch_size)
         
         model.fit(self.train, self.train["labels"])
