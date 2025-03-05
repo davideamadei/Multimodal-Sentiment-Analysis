@@ -27,8 +27,7 @@ if __name__ == "__main__":
 
     train, _ = MulTweEmoDataset.load(csv_path="./dataset/train_MulTweEmo.csv", drop_something_else=True, test_split=None)
     val, _ = MulTweEmoDataset.load(csv_path="./dataset/val_MulTweEmo.csv", drop_something_else=True, test_split=None)
-    train =  train.head(10)
-    val = val.head(10)
+
     if model_type=="bert":
         train = Dataset.from_pandas(train)
         val = Dataset.from_pandas(val)
@@ -58,7 +57,7 @@ if __name__ == "__main__":
     results_dict = {data: {x: None for x in os.listdir(f".ckp/{model_type}/")} for data in ["train", "val"]}
     for ckp in os.listdir(f".ckp/{model_type}/"):
         model = model_class()
-        model.from_pretrained(f".ckp/base/{ckp}")
+        model.from_pretrained(f".ckp/{model_type}/{ckp}")
 
         train_predictions, train_scores = model.score(train, train["labels"])
         results_dict["train"][ckp] = train_scores
