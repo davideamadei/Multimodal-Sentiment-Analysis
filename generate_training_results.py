@@ -24,7 +24,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     model_type = args.model
-    model_type = "base"
 
     train, _ = MulTweEmoDataset.load(csv_path="./dataset/train_MulTweEmo.csv", drop_something_else=True, test_split=None)
     val, _ = MulTweEmoDataset.load(csv_path="./dataset/val_MulTweEmo.csv", drop_something_else=True, test_split=None)
