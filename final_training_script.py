@@ -8,9 +8,30 @@ from transformers import AutoTokenizer
 import os
 import sklearn.metrics as skm
 import pandas as pd
+import optuna
+import numpy as np
+import math
+from pathlib import Path
+
+def sigmoid(x):
+    return 1 / (1 + math.exp(-x))
+
+def compute_metrics_bert(eval_pred):
+    y_pred, y_true = eval_pred
+    
+    y_pred = np.vectorize(sigmoid)(y_pred) > 0.5
+    y_pred = y_pred > 0.5
+    metrics_dict = {}
+
+    metrics_dict["accuracy"] = skm.accuracy_score(y_true, y_pred, normalize=True, sample_weight=None)
+    metrics_dict["recall"] = skm.recall_score(y_true=y_true, y_pred=y_pred, average='samples', zero_division=0)
+    metrics_dict["precision"] = skm.precision_score(y_true=y_true, y_pred=y_pred, average='samples', zero_division=0)
+    metrics_dict["f1_score"] = skm.f1_score(y_true=y_true, y_pred=y_pred, average='samples', zero_division=0)
+    return metrics_dict
 
 def compute_metrics(eval_pred):
     y_pred, y_true = eval_pred
+    
     y_pred = y_pred > 0.5
     metrics_dict = {}
 
@@ -26,22 +47,25 @@ if __name__ == "__main__":
         description='Train MSA model',
     )
     parser.add_argument('-m', '--model', choices=["bert", "base", "base_captions", "base_augment"], type=str, default="base", help="the model to train")
-    
+    parser.add_argument("-t", "--trial", type=int)
     parser.add_argument("--seed", type=int, default=123)
 
     args = parser.parse_args()
     
     model_type = args.model
     seed = args.seed
-    manual_seed(seed)
+    trial = args.trial
+    storage_name = "sqlite:///final_study_2.db"
+    study = optuna.create_study(study_name=model_type+"_final_study", storage=storage_name, load_if_exists=True, directions=["minimize", "maximize", "maximize"])
+    trials = study.get_trials()
+
+    label_names = MulTweEmoDataset.get_labels()
 
     train, _ = MulTweEmoDataset.load(csv_path="./dataset/train_MulTweEmo.csv", mode="M", drop_something_else=True, test_split=None, seed=123)
 
     val, _ = MulTweEmoDataset.load(csv_path="./dataset/val_MulTweEmo.csv", mode="M", drop_something_else=True, test_split=None, seed=123)
+    test, _ = MulTweEmoDataset.load(csv_path="./dataset/test_MulTweEmo.csv", mode="M", drop_something_else=True, test_split=None, seed=123)
 
-    # train = train.head(20)
-    # val = val.head(10)
-    
     os.environ["WANDB_PROJECT"] = "final_models"
 
     if model_type == "bert":
@@ -58,59 +82,60 @@ if __name__ == "__main__":
 
         train = Dataset.from_pandas(train)
         val = Dataset.from_pandas(val)
+        test = Dataset.from_pandas(test)
 
         train = train.map(_preprocess_data, batched=True, remove_columns=[col for col in train.column_names if col != "labels"])
         val = val.map(_preprocess_data, batched=True, remove_columns=[col for col in val.column_names if col != "labels"])
+        test = test.map(_preprocess_data, batched=True, remove_columns=[col for col in test.column_names if col != "labels"])
+        manual_seed(seed)
 
-        model = BertWrapper(n_epochs=11,
-                            batch_size=16,
-                            warmup_steps=20,
-                            learning_rate=4.259470947149478e-05,
+        model = BertWrapper(**(trials[trial].params),
                             output_dir=model_type,
                             run_name=model_type,
                             seed=seed
                             )
+        
+        metrics_function = compute_metrics_bert
 
         
     elif model_type == "base":
         train = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=train, model="base", text_column="tweet", label_column="labels"))
         val = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=val, model="base", text_column="tweet", label_column="labels"))
+        test = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=test, model="base", text_column="tweet", label_column="labels"))
 
+        manual_seed(seed)
         model = TweetMSAWrapper(clip_version="base",
-                                n_epochs=14,
+                                **(trials[trial].params),
                                 batch_size=16,
-                                warmup_steps=150,
-                                learning_rate=1.6856413214253974e-05,
-                                n_layers=1,
-                                n_units=66,
-                                dropout=0.3240428275567533,
                                 output_dir=model_type,
                                 run_name=model_type,
                                 seed=seed
                                 )    
             
-    elif model_type == "base_captions":
-        train = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=train, model="base", text_column="tweet", label_column="labels"))
-        val = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=val, model="base", text_column="tweet", label_column="labels"))
-       
-        tweet_caption_data = train.apply(lambda x: x["tweet"] + " " + x["caption"], axis=1)
-        train["tweet"] = tweet_caption_data 
+        metrics_function = compute_metrics
         
+    elif model_type == "base_captions":
+        tweet_caption_data = train.apply(lambda x: x["tweet"] + " " + x["caption"], axis=1)
+        train["tweet"] = tweet_caption_data
+
+        train = TweetMSA.preprocess_dataset(dataset=train, model="base", text_column="tweet", label_column="labels")
+        val = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=val, model="base", text_column="tweet", label_column="labels"))
+        test = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=test, model="base", text_column="tweet", label_column="labels"))
+
+        train = Dataset.from_pandas(train)
+
         model = TweetMSAWrapper(clip_version="base",
-                                n_epochs=14,
+                                **(trials[trial].params),
                                 batch_size=16,
-                                warmup_steps=150,
-                                learning_rate=1.6856413214253974e-05,
-                                n_layers=1,
-                                n_units=66,
-                                dropout=0.2,
                                 output_dir=model_type,
                                 run_name=model_type,
                                 seed=seed
                                 )
         
+        metrics_function = compute_metrics
+
     else:
-        silver_train = MulTweEmoDataset.load_silver_dataset(silver_label_mode="threshold",
+        silver_train, _ = MulTweEmoDataset.load_silver_dataset(silver_label_mode="threshold",
                                                             seed_threshold=0.82,
                                                             top_seeds={
                                                                 "trust":40,
@@ -125,21 +150,39 @@ if __name__ == "__main__":
         
         train = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=train, model="base", text_column="tweet", label_column="labels"))
         val = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=val, model="base", text_column="tweet", label_column="labels"))
+        test = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=test, model="base", text_column="tweet", label_column="labels"))
 
         model = TweetMSAWrapper(clip_version="base",
-                                n_epochs=6,
-                                batch_size=8,
-                                warmup_steps=50,
-                                learning_rate=2.8626493397033086e-05,
-                                n_layers=1,
-                                n_units=199,
-                                dropout=0.2443714062077184,
+                                **(trials[trial].params),
                                 output_dir=model_type,
                                 run_name=model_type,
                                 seed=seed
                                 )
         
-    model.fit(train, train["labels"], val, compute_metrics=compute_metrics)
+        metrics_function = compute_metrics
+        
+    model.fit(train, train["labels"], val, compute_metrics=metrics_function)
+    
+    _, results = model.score(val, val["labels"])
+    val_predictions = model.predict(val).predictions
+    test_predictions = model.predict(test).predictions
+    train_predictions = model.predict(train).predictions
+
+    print("\n\n\n")
+    print(results)
+    print(skm.classification_report(val["labels"], val_predictions>0.5, output_dict=False, zero_division=0, target_names=label_names))
+
+    save_dir = Path(f"./multimodal_results/{model_type}/")
+    save_dir.mkdir(parents=True, exist_ok=True)
+    with open(f"./multimodal_results/{model_type}/val_predictions.np", "wb") as f:
+        np.save(f, val_predictions)
+
+    with open(f"./multimodal_results/{model_type}/test_predictions.np", "wb") as f:
+        np.save(f, test_predictions)
+        
+    with open(f"./multimodal_results/{model_type}/train_predictions.np", "wb") as f:
+        np.save(f, train_predictions)
+
     
 
         
