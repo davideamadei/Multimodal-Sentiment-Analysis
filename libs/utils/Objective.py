@@ -33,7 +33,7 @@ class TweetMSAObjective(object):
             self.train = pd.concat([train, silver_train])
         else:        
             self.train, _ = MulTweEmoDataset.load(csv_path="./dataset/train_MulTweEmo.csv", mode=mode, drop_something_else=True,
-                                                emoji_decoding=process_emojis, drop_low_support=True, test_split=None, seed=seed)
+                                                emoji_decoding=process_emojis, drop_low_support=drop_low_support, test_split=None, seed=seed)
             if append_captions:
                 tweet_caption_data = self.train.apply(lambda x: x["tweet"] + " " + x["caption"], axis=1)
                 self.train["tweet"] = tweet_caption_data
@@ -54,6 +54,7 @@ class TweetMSAObjective(object):
         self.data_augment = data_augment
         self.append_captions = append_captions
         self.n_classes = n_classes
+        self.drop_low_support = drop_low_support
         self.seed = seed
 
     def __call__(self, trial):
@@ -74,7 +75,7 @@ class TweetMSAObjective(object):
                                 freeze_weights=self.freeze_weights, text_only=self.text_only, n_classes=self.n_classes)
         model.fit(self.train, self.train["labels"])
         predictions, results =  model.score(self.val, self.val["labels"])
-        label_names = MulTweEmoDataset.get_labels()
+        label_names = MulTweEmoDataset.get_labels(drop_low_support=self.drop_low_support)
         metrics = skm.classification_report(self.val["labels"], predictions, output_dict=True, zero_division=0, target_names=label_names)
         for key, value in metrics.items():
             trial.set_user_attr(key, value)
@@ -123,7 +124,7 @@ class BertObjective(object):
         
         model.fit(self.train, self.train["labels"])
         predictions, results =  model.score(self.val, self.val["labels"])
-        label_names = MulTweEmoDataset.get_labels()
+        label_names = MulTweEmoDataset.get_labels(drop_low_support=self.drop_low_support)
         metrics = skm.classification_report(self.val["labels"], predictions, output_dict=True, zero_division=0, target_names=label_names)
         for key, value in metrics.items():
             trial.set_user_attr(key, value)
