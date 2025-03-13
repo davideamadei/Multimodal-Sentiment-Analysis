@@ -15,6 +15,7 @@ class TweetMSAConfig(PretrainedConfig):
         weight_initialization: str = "xavier_normal",
         use_focal_loss: bool = False,
         text_only: bool = False,
+        n_classes: int = 9,
         **kwargs) -> None:
       
       # TODO: clip_large is currently not working
@@ -42,7 +43,7 @@ class TweetMSAConfig(PretrainedConfig):
       self.use_focal_loss = use_focal_loss
 
       self.text_only = text_only
-
+      self.n_classes = n_classes
       super().__init__(**kwargs)
 
     @staticmethod

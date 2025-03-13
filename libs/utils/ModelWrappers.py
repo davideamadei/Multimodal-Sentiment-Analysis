@@ -60,7 +60,7 @@ class TweetMSAWrapper(CustomWrapper):
     def __init__(self, learning_rate:float=1e-5, batch_size:int=16, n_epochs:int=10,
                 n_layers:int=2, n_units:int=512, dropout:float=0.2, 
                 warmup_steps:int=100, clip_version:str="jina", freeze_weights=False, text_only=False,
-                seed=123, output_dir:str=None, run_name:str=None):
+                n_classes:int=9, seed=123, output_dir:str=None, run_name:str=None):
         super().__init__()
         self.learning_rate = learning_rate
         self.batch_size = batch_size
@@ -72,6 +72,7 @@ class TweetMSAWrapper(CustomWrapper):
         self.clip_version = clip_version
         self.freeze_weights = freeze_weights
         self.text_only = text_only
+        self.n_classes=n_classes
         self.output_dir = output_dir
         self.run_name = run_name
         self.seed = seed
@@ -82,7 +83,8 @@ class TweetMSAWrapper(CustomWrapper):
             layers=self.n_layers,
             n_units=self.n_units,
             dropout_p=self.dropout,
-            text_only=self.text_only)
+            text_only=self.text_only,
+            n_classes=self.n_classes)
         
         if ckp_dir:
             model = TweetMSA.from_pretrained(ckp_dir).cuda()

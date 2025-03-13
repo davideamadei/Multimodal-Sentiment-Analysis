@@ -14,10 +14,14 @@ import emoji
 
 # a list of the possible labels for the dataset
 
-def get_labels(drop_something_else=True):
+def get_labels(drop_something_else=True, drop_low_support=False):
     labels = ['anger', 'anticipation', 'disgust', 'fear', 'joy', 'neutral', 'sadness', 'something else', 'surprise', 'trust']
     if drop_something_else:
         labels.remove("something else")
+    if drop_low_support:
+        labels.remove("fear")
+        labels.remove("surprise")
+        labels.remove("trust")
     return labels
 
 def get_id2label(drop_something_else=True):
@@ -160,7 +164,7 @@ def _create_csv(raw_dataset_path="./dataset/raw/MulTweEmo_raw.pkl", csv_path="./
 def load(mode:str="M", raw_dataset_path:str="./dataset/raw/MulTweEmo_raw.pkl", csv_path:str="./dataset/MulTweEmo.csv", 
         image_path:str="./dataset/images", image_zip_path:str="./dataset/raw/images.zip",
         force_override=False, preprocess_tweets=True, emoji_decoding=False, build_label_matrix=True, drop_something_else=True,
-        create_dataset=False, test_split:float=None, seed:int=None)->tuple[pd.DataFrame]:
+        drop_low_support=False, create_dataset=False, test_split:float=None, seed:int=None)->tuple[pd.DataFrame]:
         
     """function to load the MulTweEmo dataset, downloads dataset if not cached. The processed dataset for further uses is also saved as a csv
 
@@ -250,10 +254,13 @@ def load(mode:str="M", raw_dataset_path:str="./dataset/raw/MulTweEmo_raw.pkl", c
 
     # remove rows without a label
     id_list = []
-    labels = get_labels(drop_something_else)
+    labels = get_labels(drop_something_else, drop_low_support)
 
     if drop_something_else:
         dataset = dataset.drop(columns=["something else"])
+    
+    if drop_low_support:
+        dataset = dataset.drop(columns=["fear", "surprise", "trust"])
 
     if build_label_matrix:
         dataset.insert(2, "labels", _build_label_matrix(dataset, labels))
@@ -303,7 +310,7 @@ def load_silver_dataset(raw_dataset_path="./dataset/MulTweEmo_raw.pkl",
     emotions_t = {emotion: "T_"+emotion.capitalize() for emotion in labels}
     
     label_columns = list(emotions_m.values()) + list(emotions_t.values())
-    columns = ["id", "tweet"] + label_columns
+    columns = ["id", "tweet", "img_count"] + label_columns
 
     dataset[label_columns] = 0
 

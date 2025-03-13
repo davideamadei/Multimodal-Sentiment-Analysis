@@ -20,6 +20,7 @@ if __name__ == "__main__":
     parser.add_argument("--silver_data_augment", action="store_true", help="add silver label only data to training dataset")
     parser.add_argument("--threshold", type=float, default=0.82, help="threshold for seeds to choose labels in silver label only data. Only used when --silver_data_augment is used")
     parser.add_argument("--process_emojis", action="store_true", help="replace emojis with text representation")
+    parser.add_argument("--drop_low_support", action="store_true", help="uses only classes with high support")
 
     parser.add_argument("-t", "--trials", type=int, default=None, help="number of trials to run, by default continues until killed")
     parser.add_argument("-T", "--timeout", type=int, default=None, help="how long to continue hpyerparameter searching in seconds, by default continues until killed")
@@ -35,7 +36,9 @@ if __name__ == "__main__":
     final_tuning = args.final_tuning
     silver_data_augment = args.silver_data_augment
     text_only = args.text_only
-
+    n_classes=9
+    if args.drop_low_support:
+        n_classes=6
     if model != "multimodal" and (args.freeze_weights or args.silver_data_augment or text_only):
         raise ValueError("--freeze_weights, --data_augment and --text_only cannot be passed for non multimodal model")
     
@@ -57,7 +60,7 @@ if __name__ == "__main__":
         if model == "multimodal":
             objective = TweetMSAObjective(clip_version=clip, append_captions=args.append_captions, process_emojis=args.process_emojis,
                                         freeze_weights=args.freeze_weights, data_augment=silver_data_augment, seed_threshold=args.threshold, 
-                                        text_only=text_only, seed=seed, mode=mode)
+                                        text_only=text_only, n_classes=n_classes, seed=seed, mode=mode)
             study_name = f"{clip}"  # Unique identifier of the study.
         elif model == "text":
             objective = BertObjective(append_captions=args.append_captions, process_emojis=args.process_emojis, mode=mode, seed=seed)
@@ -82,8 +85,13 @@ if __name__ == "__main__":
                 study_name = f"{clip}_captions_final"
             else:
                 objective = TweetMSAObjectiveFinal(clip_version=clip, append_captions=args.append_captions, process_emojis=args.process_emojis,
-                                        freeze_weights=args.freeze_weights, seed=seed, mode=mode)
-                study_name = f"{clip}_final"
+                                        freeze_weights=args.freeze_weights, text_only=text_only, n_classes=n_classes,
+                                        seed=seed, mode=mode, drop_low_support=args.drop_low_support)
+                study_name = f"{clip}"
+                if text_only:
+                    study_name += "_text_only"
+                study_name += "_final"
+                    
         elif model == "text":
             objective = BertObjectiveFinal(append_captions=args.append_captions, process_emojis=args.process_emojis, mode=mode, seed=seed)
             study_name = "bert_final"  # Unique identifier of the study.

@@ -48,7 +48,7 @@ class TweetMSA(PreTrainedModel):
             self.fc_layers.append(layer)        
 
         output_layer = nn.Sequential()
-        output_layer.append(nn.Linear(config.n_units, 9))
+        output_layer.append(nn.Linear(config.n_units, self.n_classes))
         self.fc_layers.append(output_layer)
 
         self.criterion = nn.BCEWithLogitsLoss(reduction='none')

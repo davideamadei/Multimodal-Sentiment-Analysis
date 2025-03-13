@@ -11,8 +11,8 @@ import pandas as pd
 import torch
 
 class TweetMSAObjective(object):
-    def __init__(self, clip_version="jina", append_captions:bool=False, process_emojis:bool=False, data_augment:bool=False, seed_threshold=0.82,
-                mode="M", freeze_weights:bool=False, text_only:bool=False, seed:int=123):
+    def __init__(self, clip_version="jina", append_captions:bool=False, process_emojis:bool=False, data_augment:bool=False, 
+                seed_threshold=0.82, n_classes:int=9, drop_low_support=False, mode="M", freeze_weights:bool=False, text_only:bool=False, seed:int=123):
         if data_augment:
             train, _ = MulTweEmoDataset.load(csv_path="./dataset/train_MulTweEmo.csv", mode=mode, drop_something_else=True,
                                                 emoji_decoding=process_emojis, test_split=None, seed=seed)
@@ -33,12 +33,13 @@ class TweetMSAObjective(object):
             self.train = pd.concat([train, silver_train])
         else:        
             self.train, _ = MulTweEmoDataset.load(csv_path="./dataset/train_MulTweEmo.csv", mode=mode, drop_something_else=True,
-                                                emoji_decoding=process_emojis, test_split=None, seed=seed)
+                                                emoji_decoding=process_emojis, drop_low_support=True, test_split=None, seed=seed)
             if append_captions:
                 tweet_caption_data = self.train.apply(lambda x: x["tweet"] + " " + x["caption"], axis=1)
                 self.train["tweet"] = tweet_caption_data
 
-        self.val, _ = MulTweEmoDataset.load(csv_path="./dataset/val_MulTweEmo.csv", mode=mode, drop_something_else=True, test_split=None, seed=seed)
+        self.val, _ = MulTweEmoDataset.load(csv_path="./dataset/val_MulTweEmo.csv", drop_low_support=drop_low_support,
+                                             mode=mode, drop_something_else=True, test_split=None, seed=seed)
 
         if text_only and not append_captions:
             self.train = self.train.drop_duplicates(subset=["id"])
@@ -52,6 +53,7 @@ class TweetMSAObjective(object):
         self.text_only = text_only
         self.data_augment = data_augment
         self.append_captions = append_captions
+        self.n_classes = n_classes
         self.seed = seed
 
     def __call__(self, trial):
@@ -67,8 +69,9 @@ class TweetMSAObjective(object):
         dropout = trial.suggest_float("dropout", 0.0, 1.0)
         torch.manual_seed(self.seed)
         model = TweetMSAWrapper(n_epochs=n_epochs, warmup_steps=warmup_steps, learning_rate=learning_rate, 
-                                 batch_size=batch_size, n_layers=n_layers, n_units=n_units,
-                                 dropout=dropout, clip_version=self.clip_version, freeze_weights=self.freeze_weights, text_only=self.text_only)
+                                batch_size=batch_size, n_layers=n_layers, n_units=n_units,
+                                dropout=dropout, clip_version=self.clip_version, 
+                                freeze_weights=self.freeze_weights, text_only=self.text_only, n_classes=self.n_classes)
         model.fit(self.train, self.train["labels"])
         predictions, results =  model.score(self.val, self.val["labels"])
         label_names = MulTweEmoDataset.get_labels()
@@ -234,7 +237,7 @@ class TweetMSAObjectiveFinal(TweetMSAObjective):
         torch.manual_seed(self.seed)
         model = TweetMSAWrapper(n_epochs=n_epochs, warmup_steps=warmup_steps, learning_rate=learning_rate, 
                                  batch_size=batch_size, n_layers=n_layers, n_units=n_units,
-                                 dropout=dropout, clip_version=self.clip_version, freeze_weights=self.freeze_weights)
+                                 dropout=dropout, clip_version=self.clip_version, freeze_weights=self.freeze_weights, n_classes=self.n_classes)
         model.fit(self.train, self.train["labels"])
         predictions, results =  model.score(self.val, self.val["labels"])
         label_names = MulTweEmoDataset.get_labels()
