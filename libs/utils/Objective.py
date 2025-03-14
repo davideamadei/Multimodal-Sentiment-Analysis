@@ -124,7 +124,7 @@ class BertObjective(object):
         
         model.fit(self.train, self.train["labels"])
         predictions, results =  model.score(self.val, self.val["labels"])
-        label_names = MulTweEmoDataset.get_labels(drop_low_support=self.drop_low_support)
+        label_names = MulTweEmoDataset.get_labels()
         metrics = skm.classification_report(self.val["labels"], predictions, output_dict=True, zero_division=0, target_names=label_names)
         for key, value in metrics.items():
             trial.set_user_attr(key, value)
@@ -237,11 +237,11 @@ class TweetMSAObjectiveFinal(TweetMSAObjective):
 
         torch.manual_seed(self.seed)
         model = TweetMSAWrapper(n_epochs=n_epochs, warmup_steps=warmup_steps, learning_rate=learning_rate, 
-                                 batch_size=batch_size, n_layers=n_layers, n_units=n_units,
+                                 batch_size=batch_size, n_layers=n_layers, n_units=n_units, text_only=self.text_only,
                                  dropout=dropout, clip_version=self.clip_version, freeze_weights=self.freeze_weights, n_classes=self.n_classes)
         model.fit(self.train, self.train["labels"])
         predictions, results =  model.score(self.val, self.val["labels"])
-        label_names = MulTweEmoDataset.get_labels()
+        label_names = MulTweEmoDataset.get_labels(drop_low_support=self.drop_low_support)
         metrics = skm.classification_report(self.val["labels"], predictions, output_dict=True, zero_division=0, target_names=label_names)
         for key, value in metrics.items():
             trial.set_user_attr(key, value)
