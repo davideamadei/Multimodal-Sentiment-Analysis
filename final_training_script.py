@@ -176,7 +176,7 @@ if __name__ == "__main__":
         test, _ = MulTweEmoDataset.load(csv_path="./dataset/test_MulTweEmo.csv", mode="M", drop_something_else=True,
                                           drop_low_support=True, test_split=None, seed=123)
 
-        train = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=train.head(10), model="base", text_column="tweet", label_column="labels"))
+        train = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=train, model="base", text_column="tweet", label_column="labels"))
         val = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=val, model="base", text_column="tweet", label_column="labels"))
         test = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=test, model="base", text_column="tweet", label_column="labels"))
 
