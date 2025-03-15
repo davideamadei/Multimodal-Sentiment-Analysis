@@ -29,6 +29,10 @@ if __name__ == "__main__":
     val, _ = MulTweEmoDataset.load(csv_path="./dataset/val_MulTweEmo.csv", drop_something_else=True, test_split=None)
 
     if model_type=="bert":
+        
+        train = train.drop_duplicates(subset=["id"])
+        val = val.drop_duplicates(subset=["id"])
+        
         train = Dataset.from_pandas(train)
         val = Dataset.from_pandas(val)
         train = train.map(_preprocess_data, batched=True, remove_columns=[col for col in train.column_names if col != "labels"])
@@ -49,6 +53,22 @@ if __name__ == "__main__":
         model_class = TweetMSAWrapper
 
     elif model_type=="base_captions":
+        train = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=train, model="base", text_column="tweet", label_column="labels"))
+        val = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=val, model="base", text_column="tweet", label_column="labels"))
+
+        model_class = TweetMSAWrapper
+
+    elif model_type=="high_support":
+        train, _ = MulTweEmoDataset.load(csv_path="./dataset/train_MulTweEmo.csv", drop_something_else=True, drop_low_support=True, test_split=None)
+        val, _ = MulTweEmoDataset.load(csv_path="./dataset/val_MulTweEmo.csv", drop_something_else=True, drop_low_support=True, test_split=None)
+        train = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=train, model="base", text_column="tweet", label_column="labels"))
+        val = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=val, model="base", text_column="tweet", label_column="labels"))
+
+        model_class = TweetMSAWrapper
+
+    elif model_type=="text_only":        
+        train = train.drop_duplicates(subset=["id"])
+        val = val.drop_duplicates(subset=["id"])
         train = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=train, model="base", text_column="tweet", label_column="labels"))
         val = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=val, model="base", text_column="tweet", label_column="labels"))
 

@@ -46,7 +46,7 @@ if __name__ == "__main__":
         prog='train_msa',
         description='Train MSA model',
     )
-    parser.add_argument('-m', '--model', choices=["bert", "base", "base_captions", "base_augment"], type=str, default="base", help="the model to train")
+    parser.add_argument('-m', '--model', choices=["bert", "base", "base_captions", "base_augment", "text_only", "high_support"], type=str, default="base", help="the model to train")
     parser.add_argument("-t", "--trial", type=int)
     parser.add_argument("--seed", type=int, default=123)
 
@@ -68,6 +68,7 @@ if __name__ == "__main__":
 
     os.environ["WANDB_PROJECT"] = "final_models"
 
+    # trial 268
     if model_type == "bert":
         def _preprocess_data(examples):
             tokenizer = AutoTokenizer.from_pretrained("bert-large-uncased")
@@ -78,7 +79,7 @@ if __name__ == "__main__":
 
         train = train.drop_duplicates(subset=["id"])
         val = val.drop_duplicates(subset=["id"])
-        val = val[~val.id.isin(train.id.values)]
+        test = test.drop_duplicates(subset=["id"])
 
         train = Dataset.from_pandas(train)
         val = Dataset.from_pandas(val)
@@ -97,7 +98,7 @@ if __name__ == "__main__":
         
         metrics_function = compute_metrics_bert
 
-        
+    # trial 167
     elif model_type == "base":
         train = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=train, model="base", text_column="tweet", label_column="labels"))
         val = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=val, model="base", text_column="tweet", label_column="labels"))
@@ -113,7 +114,8 @@ if __name__ == "__main__":
                                 )    
             
         metrics_function = compute_metrics
-        
+    
+    # trial 287
     elif model_type == "base_captions":
         tweet_caption_data = train.apply(lambda x: x["tweet"] + " " + x["caption"], axis=1)
         train["tweet"] = tweet_caption_data
@@ -124,6 +126,7 @@ if __name__ == "__main__":
 
         train = Dataset.from_pandas(train)
 
+        manual_seed(seed)
         model = TweetMSAWrapper(clip_version="base",
                                 **(trials[trial].params),
                                 batch_size=16,
@@ -134,9 +137,11 @@ if __name__ == "__main__":
         
         metrics_function = compute_metrics
 
-    else:
+    # trial 214
+    elif model_type == "base_augment":
+        print(model_type)
         silver_train, _ = MulTweEmoDataset.load_silver_dataset(silver_label_mode="threshold",
-                                                            seed_threshold=0.82,
+                                                            seed_threshold=0.84,
                                                             top_seeds={
                                                                 "trust":40,
                                                                 "fear":40,
@@ -152,6 +157,7 @@ if __name__ == "__main__":
         val = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=val, model="base", text_column="tweet", label_column="labels"))
         test = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=test, model="base", text_column="tweet", label_column="labels"))
 
+        manual_seed(seed)
         model = TweetMSAWrapper(clip_version="base",
                                 **(trials[trial].params),
                                 output_dir=model_type,
@@ -160,7 +166,55 @@ if __name__ == "__main__":
                                 )
         
         metrics_function = compute_metrics
+    
+    # trial 170
+    elif model_type == "high_support":
+        train, _ = MulTweEmoDataset.load(csv_path="./dataset/train_MulTweEmo.csv", mode="M", drop_something_else=True,
+                                          drop_low_support=True, test_split=None, seed=123)
+        val, _ = MulTweEmoDataset.load(csv_path="./dataset/val_MulTweEmo.csv", mode="M", drop_something_else=True,
+                                          drop_low_support=True, test_split=None, seed=123)
+        test, _ = MulTweEmoDataset.load(csv_path="./dataset/test_MulTweEmo.csv", mode="M", drop_something_else=True,
+                                          drop_low_support=True, test_split=None, seed=123)
+
+        train = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=train.head(10), model="base", text_column="tweet", label_column="labels"))
+        val = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=val, model="base", text_column="tweet", label_column="labels"))
+        test = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=test, model="base", text_column="tweet", label_column="labels"))
+
+        manual_seed(seed)
+        model = TweetMSAWrapper(clip_version="base",
+                                **(trials[trial].params),
+                                batch_size=16,
+                                n_classes=6,
+                                output_dir=model_type,
+                                run_name=model_type,
+                                seed=seed
+                                )
+
+        metrics_function = compute_metrics
+    
+    # trial ???
+    elif model_type == "text_only":
+        tweet_caption_data = train.apply(lambda x: x["tweet"] + " " + x["caption"], axis=1)
+        train["tweet"] = tweet_caption_data
+
+        train = TweetMSA.preprocess_dataset(dataset=train, model="base", text_column="tweet", label_column="labels")
+        val = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=val, model="base", text_column="tweet", label_column="labels"))
+        test = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=test, model="base", text_column="tweet", label_column="labels"))
+
+        train = Dataset.from_pandas(train)
+
+        manual_seed(seed)
+        model = TweetMSAWrapper(clip_version="base",
+                                **(trials[trial].params),
+                                batch_size=16,
+                                text_only=True,
+                                output_dir=model_type,
+                                run_name=model_type,
+                                seed=seed
+                                )
         
+        metrics_function = compute_metrics
+    
     model.fit(train, train["labels"], val, compute_metrics=metrics_function)
     
     _, results = model.score(val, val["labels"])
