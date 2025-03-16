@@ -175,6 +175,7 @@ if __name__ == "__main__":
                                           drop_low_support=True, test_split=None, seed=123)
         test, _ = MulTweEmoDataset.load(csv_path="./dataset/test_MulTweEmo.csv", mode="M", drop_something_else=True,
                                           drop_low_support=True, test_split=None, seed=123)
+        label_names = MulTweEmoDataset.get_labels(drop_low_support=True)
 
         train = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=train, model="base", text_column="tweet", label_column="labels"))
         val = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=val, model="base", text_column="tweet", label_column="labels"))
@@ -194,14 +195,14 @@ if __name__ == "__main__":
     
     # trial ???
     elif model_type == "text_only":
-        tweet_caption_data = train.apply(lambda x: x["tweet"] + " " + x["caption"], axis=1)
-        train["tweet"] = tweet_caption_data
+        
+        train = train.drop_duplicates(subset=["id"])
+        val = val.drop_duplicates(subset=["id"])
+        test = test.drop_duplicates(subset=["id"])
 
-        train = TweetMSA.preprocess_dataset(dataset=train, model="base", text_column="tweet", label_column="labels")
+        train = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=train, model="base", text_column="tweet", label_column="labels"))
         val = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=val, model="base", text_column="tweet", label_column="labels"))
         test = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=test, model="base", text_column="tweet", label_column="labels"))
-
-        train = Dataset.from_pandas(train)
 
         manual_seed(seed)
         model = TweetMSAWrapper(clip_version="base",
