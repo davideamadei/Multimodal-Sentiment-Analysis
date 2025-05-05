@@ -1,8 +1,8 @@
 from transformers import PretrainedConfig
-import torch
 
 
-class TweetMSAConfig(PretrainedConfig):
+class TweetMERConfig(PretrainedConfig):
+    "Class storing the configuration of TweetMERModel"
     model_type = "multimodal-sentiment-analysis"
 
     def __init__(
@@ -17,8 +17,35 @@ class TweetMSAConfig(PretrainedConfig):
         text_only: bool = False,
         n_classes: int = 9,
         **kwargs) -> None:
+      """_summary_
+
+      Parameters
+      ----------
+      feature_extractor : str, optional
+          which feature extractor to use, by default "jina"
+      feature_extractor_config : PretrainedConfig, optional
+          the configuration class of the feature extractor, by default None
+      dropout_p : float, optional
+          parameter controlling the dropout of hidden layers, by default 0.2
+      n_layers : int, optional
+          number of hidden layers, by default 2
+      n_units : int, optional
+          number of units in each hidden layer, by default 512
+      weight_initialization : str, optional
+          weight initialization method to use, by default "xavier_normal"
+      use_focal_loss : bool, optional
+          flag controlling the usage of the focal loss, by default False
+      text_only : bool, optional
+          flag controlling wether to use only text or both image and text, by default False
+      n_classes : int, optional
+          number of classes that the model has to distinguish between, by default 9
+
+      Raises
+      ------
+      ValueError
+          when invalid inputs are given
+      """
       
-      # TODO: clip_large is currently not working
       if feature_extractor not in ["jina", "base", "large", "siglip", "blip2"]:
         raise ValueError("Only the following models are accepted for feature extraction:\n" + "\n".join(["jina", "base", "large", "siglip", "blip2"]))
       if n_layers <= 0:
@@ -30,7 +57,7 @@ class TweetMSAConfig(PretrainedConfig):
         raise ValueError("Dropout rate must be between 0 and 1")
 
       self.feature_extractor_name_simple = feature_extractor
-      self.feature_extractor_name = TweetMSAConfig.get_feature_extractor_name(feature_extractor)
+      self.feature_extractor_name = TweetMERConfig.get_feature_extractor_name(feature_extractor)
       self.feature_extractor_config = feature_extractor_config
 
       self.dropout_p = dropout_p

@@ -1,16 +1,23 @@
-from .TweetMSAConfig import TweetMSAConfig
+from .TweetMERConfig import TweetMERConfig
 from transformers import PreTrainedModel, AutoModel, AutoProcessor, Blip2ForImageTextRetrieval
-from torch import nn, concatenate, where
+from torch import nn, concatenate, Tensor
 import pandas as pd
 from PIL import Image
 import requests
 from io import BytesIO
 
-# TODO weight initialization
 
-class TweetMSA(PreTrainedModel):
-    config_class=TweetMSAConfig
-    def __init__(self, config: TweetMSAConfig) -> None:
+class TweetMERModel(PreTrainedModel):
+    "Class implementing a model for Tweet Multimodal Emotion Recognition"
+    config_class=TweetMERConfig
+    def __init__(self, config: TweetMERConfig) -> None:
+        """init function
+
+        Parameters
+        ----------
+        config : TweetMSAConfig
+            config class for values of different parameters of the model
+        """
         super().__init__(config)
         self.config=config
         # the processor of the feature extractor is loaded but is not actually used, it is only present for external access
@@ -19,7 +26,7 @@ class TweetMSA(PreTrainedModel):
             self.feature_extractor = AutoModel.from_pretrained(config.feature_extractor_name, trust_remote_code=True)
         else:
             self.feature_extractor = Blip2ForImageTextRetrieval.from_pretrained(
-                TweetMSAConfig.get_feature_extractor_name(self.config.feature_extractor_name_simple))
+                TweetMERConfig.get_feature_extractor_name(self.config.feature_extractor_name_simple))
 
         self.fc_layers = nn.ModuleList()
 
@@ -29,6 +36,7 @@ class TweetMSA(PreTrainedModel):
         if self.config.text_only:
             n_inputs = 1
 
+        # initialize the input layer of the FC classification head depending on the used feature extractor
         if self.config.feature_extractor_name_simple == "blip2":
             input_layer.append(nn.Linear(256*n_inputs, config.n_units))
         elif self.config.feature_extractor_name_simple == "siglip":
@@ -40,6 +48,7 @@ class TweetMSA(PreTrainedModel):
         input_layer.append(nn.LeakyReLU())
         self.fc_layers.append(input_layer)
         
+        # add the hidden layers to the model
         for i in range(config.n_layers-1):
             layer = nn.Sequential()
             layer.append(nn.Linear(config.n_units, config.n_units))
@@ -47,6 +56,7 @@ class TweetMSA(PreTrainedModel):
             layer.append(nn.LeakyReLU())
             self.fc_layers.append(layer)        
 
+        # add the output layer to the model
         output_layer = nn.Sequential()
         output_layer.append(nn.Linear(config.n_units, self.config.n_classes))
         self.fc_layers.append(output_layer)
@@ -57,12 +67,38 @@ class TweetMSA(PreTrainedModel):
 
         self.fc_layers.apply(self._init_weights)    
     
-    def _init_weights(self, m):
+    def _init_weights(self, m:nn.Linear):
+        """Function to initialize the weights of a layer
+
+        Parameters
+        ----------
+        m : nn.Linear
+            layer to initialize the weights of
+        """
         if isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
             nn.init.xavier_normal_(m.weight)
             m.bias.data.fill_(0.01)
 
-    def forward(self, input_ids, pixel_values, attention_mask=None, labels=None):
+    def forward(self, input_ids:Tensor, pixel_values:Tensor, attention_mask:Tensor=None, labels:Tensor=None)->Tensor|dict:
+        """Forward call of the model
+
+        Parameters
+        ----------
+        input_ids : Tensor
+            embeddings of the input text
+        pixel_values : Tensor
+            embeddings of the input image
+        attention_mask : Tensor, optional
+            attention mask of the input text, by default None
+        labels : Tensor, optional
+            labels of the input data, by default None
+
+        Returns
+        -------
+        Tensor|dict
+            The outputs of the model. If the data in input has labels the loss is also returned in a dict with the outputs
+        """
+        # encode inputs with feature extractor
         if self.config.feature_extractor_name_simple != "blip2":
             text_embedding = self.feature_extractor.get_text_features(input_ids=input_ids, attention_mask=attention_mask)
             if not self.config.text_only:
@@ -78,11 +114,14 @@ class TweetMSA(PreTrainedModel):
         else:
             logits = concatenate((text_embedding, image_embedding), axis=-1)
 
+        # give features to FC network
         for layer in self.fc_layers:
             logits = layer(logits)
 
+        # apply sigmoid for final outputs
         outputs = self.sigmoid(logits)
 
+        # compute loss if labels are given in input
         if labels is not None :
             loss = self.criterion(logits, labels)
             if self.config.use_focal_loss:
@@ -94,11 +133,36 @@ class TweetMSA(PreTrainedModel):
         return outputs
 
     @staticmethod
-    def preprocess_dataset(dataset, model="jina", text_column="tweet", image_column="img_path", label_column=None):
+    def preprocess_dataset(dataset:pd.DataFrame, model="jina", text_column="tweet", image_column="img_path", label_column:str=None)->pd.DataFrame:
+        """Static function to preprocess dataset so they can be given in input to to the model
+
+        Parameters
+        ----------
+        dataset : pd.DataFrame
+            dataset to preprocess
+        model : str, optional
+            the model to use the Processor of, by default "jina"
+        text_column : str, optional
+            the column containing the text to use for the processed dataset, by default "tweet"
+        image_column : str, optional
+            the column containing the paths of the images, by default "img_path"
+        label_column : str, optional
+            the column containing the labels, by default None
+
+        Returns
+        -------
+        pd.DataFrame
+            the processed dataset usable as input of the model
+
+        Raises
+        ------
+        ValueError
+            when invalid inputs are given
+        """
         if model not in ["jina", "base", "large", "siglip", "blip2"]:
             raise ValueError("Only the following models are accepted:\n" + "\n".join(["jina", "base", "large", "blip2"]))
         
-        processor = AutoProcessor.from_pretrained(TweetMSAConfig.get_feature_extractor_name(model), trust_remote_code=True)
+        processor = AutoProcessor.from_pretrained(TweetMERConfig.get_feature_extractor_name(model), trust_remote_code=True)
 
         processed_images= []
         for img in dataset[image_column]:

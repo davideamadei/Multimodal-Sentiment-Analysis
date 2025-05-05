@@ -1,3 +1,3 @@
 from .ModelWrappers import *
 from .Objective import *
-__all__ = ["TweetMSAWrapper", "BertWrapper", "VitWrapper", "TweetMSAObjective", "BertObjective", "VitObjective", "TweetMSAObjectiveFinal", "BertObjectiveFinal"]
+__all__ = ["TweetMERWrapper", "BertWrapper", "VitWrapper", "TweetMSAObjective", "BertObjective", "VitObjective", "TweetMSAObjectiveFinal", "BertObjectiveFinal"]

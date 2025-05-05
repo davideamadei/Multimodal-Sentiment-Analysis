@@ -12,9 +12,21 @@ import pathlib
 from sklearn.model_selection import train_test_split
 import emoji 
 
-# a list of the possible labels for the dataset
+def get_labels(drop_something_else=True, drop_low_support=False)->list[str]:
+    """Function returning the labels of the dataset
 
-def get_labels(drop_something_else=True, drop_low_support=False):
+    Parameters
+    ----------
+    drop_something_else : bool, optional
+        remove 'Something else' from the list of labels, by default True
+    drop_low_support : bool, optional
+        remove 'Fear', 'Surprise' and 'Trust' from the list of labels, by default False
+
+    Returns
+    -------
+    list[str]
+        List of labels of MulTweEmo dataset
+    """
     labels = ['anger', 'anticipation', 'disgust', 'fear', 'joy', 'neutral', 'sadness', 'something else', 'surprise', 'trust']
     if drop_something_else:
         labels.remove("something else")
@@ -24,13 +36,37 @@ def get_labels(drop_something_else=True, drop_low_support=False):
         labels.remove("trust")
     return labels
 
-def get_id2label(drop_something_else=True):
+def get_id2label(drop_something_else=True)->dict:
+    """Function returning the id2label dictionary
+
+    Parameters
+    ----------
+    drop_something_else : bool, optional
+        remove 'Something else' from the dictionary, by default True
+
+    Returns
+    -------
+    dict
+        The id2label dictionary
+    """
     id2label = {}
     for i, label in enumerate(get_labels(drop_something_else)):
         id2label[i] = label
     return id2label
 
-def get_label2id(drop_something_else=True):
+def get_label2id(drop_something_else=True)->dict:
+    """Function returning the label2id dictionary
+
+    Parameters
+    ----------
+    drop_something_else : bool, optional
+        remove 'Something else' from the dictionary, by default True
+
+    Returns
+    -------
+    dict
+        The label2id dictionary
+    """
     label2id = {}
     for i, label in enumerate(get_labels(drop_something_else)):
         label2id[label] = i
@@ -116,8 +152,6 @@ def _create_csv(raw_dataset_path="./dataset/raw/MulTweEmo_raw.pkl", csv_path="./
         path where the csv will be saved, by default "./dataset/MulTweEmo.csv"
     image_path : str, optional
         path where the images are, by default "./dataset/images"
-    image_zip_path : str, optional
-        where to save the downloaded zip atchive containing the images, by default "dataset/raw/images.zip"
     """
     with open(raw_dataset_path, 'rb') as file:
         dataset = pd.compat.pickle_compat.load(file)
@@ -190,6 +224,8 @@ def load(mode:str="M", raw_dataset_path:str="./dataset/raw/MulTweEmo_raw.pkl", c
         flag to also add labels as a list of lists, by default True
     drop_something_else : bool, optional
         flag to drop the label 'something else', and data points which only have no other labels, by default True
+    drop_low_support : bool, optional
+        flag to drop the labels 'Fear', 'Surprise' and 'Trust', by default False
     create_dataset : bool, optional
         if True the dataset is created from scratch using the raw data, by default False
     test_split : float, optional
@@ -292,9 +328,36 @@ def load_silver_dataset(raw_dataset_path="./dataset/MulTweEmo_raw.pkl",
                         seed_threshold=0.81,
                         top_seeds:(int|dict)=None,
                         **kwargs):
-        
+    """_summary_
+
+    Parameters
+    ----------
+    raw_dataset_path : str, optional
+        where to download the raw dataset, by default "./dataset/raw/MulTweEmo_raw.pkl"
+    csv_path : str, optional
+        where to save the processed dataset, by default "./dataset/MulTweEmo.csv"
+    silver_label_mode : str, optional
+        the method used to select the silver labels of the chosen data, by default "label"
+    label_name : str, optional
+        used if silver_label_mode is 'label' to select between 'uni_label' and 'multi_label' field of the dataset, by default "multi_label"
+    seed_threshold : float, optional
+        used if silver_label_mode is 'threshold' to decide the minimum score for a label to be assigned, by default 0.81
+    top_seeds : int | dict, optional
+        used if silver_label_mode is 'top' to select the minimum number of , by default None
+
+    Returns
+    -------
+    tuple[pd.DataFrame]
+        tuple containig two pandas dataframes, one with training set and one with test set. If test_split is None the test set will be None
+
+
+    Raises
+    ------
+    ValueError
+        if invalid inputs are given
+    """
     if silver_label_mode != "threshold" and silver_label_mode != "label":
-        raise ValueError("mode must be chosen between \"top\", \"threhsold\" or \"label\"")
+        raise ValueError("mode must be chosen between \"top\", \"threshold\" or \"label\"")
 
     with open(raw_dataset_path, 'rb') as file:
         dataset = pd.compat.pickle_compat.load(file)
@@ -315,7 +378,6 @@ def load_silver_dataset(raw_dataset_path="./dataset/MulTweEmo_raw.pkl",
     dataset[label_columns] = 0
 
     if silver_label_mode=="label":
-        columns
         def set_labels(row):
             if label_name == "multi_label":
                 for label in row[label_name]:
@@ -368,7 +430,21 @@ def load_silver_dataset(raw_dataset_path="./dataset/MulTweEmo_raw.pkl",
     return load(csv_path=csv_path, **kwargs)
 
 
-def _preprocess_tweet(input: dict, emoji_decoding:bool):
+def _preprocess_tweet(input: dict, emoji_decoding:bool)->dict:
+    """Function to preprocess the text of the dataset
+
+    Parameters
+    ----------
+    input : dict
+        a row of the dataset
+    emoji_decoding : bool
+        flag to choose wether to remove or replace emojis
+
+    Returns
+    -------
+    dict
+        the modified row
+    """
     tweet = input["tweet"]
 
     if emoji_decoding:
@@ -416,11 +492,25 @@ def _preprocess_tweet(input: dict, emoji_decoding:bool):
     input["tweet"] = tweet
     return input
 
-def _build_label_matrix(dataset, labels):
+def _build_label_matrix(dataset:pd.DataFrame, classes:list[str])->list[list[int]]:
+    """Function to build the matrix of labels of the dataset
+
+    Parameters
+    ----------
+    dataset : pd.DataFrame
+        dataset to generate labels from
+    classes : pd.core.series.Series
+        list of classes to convert to labels
+
+    Returns
+    -------
+    list[list[int]]
+        matrix of labels
+    """
     label_matrix = []
     for i, row in dataset.iterrows():
         label_row = []
-        for label in labels:
+        for label in classes:
             label_row.append(float(row[label]))
         label_matrix.append(label_row)
     return label_matrix

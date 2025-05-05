@@ -1,4 +1,4 @@
-from .TweetMSA import *
-from .TweetMSAConfig import *
+from .TweetMERModel import *
+from .TweetMERConfig import *
 
-__all__ = ["TweetMSA", "TweetMSAConfig"]
+__all__ = ["TweetMERModel", "TweetMERConfig"]

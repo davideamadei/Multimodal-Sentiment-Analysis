@@ -1,8 +1,8 @@
 from datasets import Dataset
 from libs.dataset_loader import MulTweEmoDataset
-from libs.utils.ModelWrappers import TweetMSAWrapper, BertWrapper, VitWrapper
+from libs.utils.ModelWrappers import TweetMERWrapper, BertWrapper, VitWrapper
 import sklearn.metrics as skm
-from libs.model import TweetMSA
+from libs.model import TweetMERModel
 from transformers import AutoTokenizer, AutoImageProcessor
 import requests
 from PIL import Image
@@ -46,8 +46,8 @@ class TweetMSAObjective(object):
             self.val = self.val.drop_duplicates(subset=["id"])
             self.val = self.val[~self.val.id.isin(self.train.id.values)]
         
-        self.train = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=self.train, model=clip_version, text_column="tweet", label_column="labels"))
-        self.val = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=self.val, model=clip_version, text_column="tweet", label_column="labels"))
+        self.train = Dataset.from_pandas(TweetMERModel.preprocess_dataset(dataset=self.train, model=clip_version, text_column="tweet", label_column="labels"))
+        self.val = Dataset.from_pandas(TweetMERModel.preprocess_dataset(dataset=self.val, model=clip_version, text_column="tweet", label_column="labels"))
         self.clip_version = clip_version
         self.freeze_weights = freeze_weights
         self.text_only = text_only
@@ -69,7 +69,7 @@ class TweetMSAObjective(object):
         n_units = trial.suggest_int("n_units", 32, 1024, log=True)
         dropout = trial.suggest_float("dropout", 0.0, 1.0)
         torch.manual_seed(self.seed)
-        model = TweetMSAWrapper(n_epochs=n_epochs, warmup_steps=warmup_steps, learning_rate=learning_rate, 
+        model = TweetMERWrapper(n_epochs=n_epochs, warmup_steps=warmup_steps, learning_rate=learning_rate, 
                                 batch_size=batch_size, n_layers=n_layers, n_units=n_units,
                                 dropout=dropout, clip_version=self.clip_version, 
                                 freeze_weights=self.freeze_weights, text_only=self.text_only, n_classes=self.n_classes)
@@ -236,9 +236,10 @@ class TweetMSAObjectiveFinal(TweetMSAObjective):
             dropout = trial.suggest_float("dropout", 0.0, 0.5)
 
         torch.manual_seed(self.seed)
-        model = TweetMSAWrapper(n_epochs=n_epochs, warmup_steps=warmup_steps, learning_rate=learning_rate, 
+        model = TweetMERWrapper(n_epochs=n_epochs, warmup_steps=warmup_steps, learning_rate=learning_rate, 
                                  batch_size=batch_size, n_layers=n_layers, n_units=n_units, text_only=self.text_only,
                                  dropout=dropout, clip_version=self.clip_version, freeze_weights=self.freeze_weights, n_classes=self.n_classes)
+        print(model.print_model())
         model.fit(self.train, self.train["labels"])
         predictions, results =  model.score(self.val, self.val["labels"])
         label_names = MulTweEmoDataset.get_labels(drop_low_support=self.drop_low_support)
