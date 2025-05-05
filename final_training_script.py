@@ -2,7 +2,7 @@ from torch import manual_seed
 import argparse
 from libs.dataset_loader import MulTweEmoDataset
 from libs.utils import *
-from libs.model import TweetMSA
+from libs.model import TweetMERModel
 from datasets import Dataset
 from transformers import AutoTokenizer
 import os
@@ -100,12 +100,12 @@ if __name__ == "__main__":
 
     # trial 167
     elif model_type == "base":
-        train = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=train, model="base", text_column="tweet", label_column="labels"))
-        val = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=val, model="base", text_column="tweet", label_column="labels"))
-        test = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=test, model="base", text_column="tweet", label_column="labels"))
+        train = Dataset.from_pandas(TweetMERModel.preprocess_dataset(dataset=train, model="base", text_column="tweet", label_column="labels"))
+        val = Dataset.from_pandas(TweetMERModel.preprocess_dataset(dataset=val, model="base", text_column="tweet", label_column="labels"))
+        test = Dataset.from_pandas(TweetMERModel.preprocess_dataset(dataset=test, model="base", text_column="tweet", label_column="labels"))
 
         manual_seed(seed)
-        model = TweetMSAWrapper(clip_version="base",
+        model = TweetMERWrapper(clip_version="base",
                                 **(trials[trial].params),
                                 batch_size=16,
                                 output_dir=model_type,
@@ -120,14 +120,14 @@ if __name__ == "__main__":
         tweet_caption_data = train.apply(lambda x: x["tweet"] + " " + x["caption"], axis=1)
         train["tweet"] = tweet_caption_data
 
-        train = TweetMSA.preprocess_dataset(dataset=train, model="base", text_column="tweet", label_column="labels")
-        val = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=val, model="base", text_column="tweet", label_column="labels"))
-        test = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=test, model="base", text_column="tweet", label_column="labels"))
+        train = TweetMERModel.preprocess_dataset(dataset=train, model="base", text_column="tweet", label_column="labels")
+        val = Dataset.from_pandas(TweetMERModel.preprocess_dataset(dataset=val, model="base", text_column="tweet", label_column="labels"))
+        test = Dataset.from_pandas(TweetMERModel.preprocess_dataset(dataset=test, model="base", text_column="tweet", label_column="labels"))
 
         train = Dataset.from_pandas(train)
 
         manual_seed(seed)
-        model = TweetMSAWrapper(clip_version="base",
+        model = TweetMERWrapper(clip_version="base",
                                 **(trials[trial].params),
                                 batch_size=16,
                                 output_dir=model_type,
@@ -153,12 +153,12 @@ if __name__ == "__main__":
                                                             )
         train = pd.concat([train, silver_train])
         
-        train = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=train, model="base", text_column="tweet", label_column="labels"))
-        val = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=val, model="base", text_column="tweet", label_column="labels"))
-        test = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=test, model="base", text_column="tweet", label_column="labels"))
+        train = Dataset.from_pandas(TweetMERModel.preprocess_dataset(dataset=train, model="base", text_column="tweet", label_column="labels"))
+        val = Dataset.from_pandas(TweetMERModel.preprocess_dataset(dataset=val, model="base", text_column="tweet", label_column="labels"))
+        test = Dataset.from_pandas(TweetMERModel.preprocess_dataset(dataset=test, model="base", text_column="tweet", label_column="labels"))
 
         manual_seed(seed)
-        model = TweetMSAWrapper(clip_version="base",
+        model = TweetMERWrapper(clip_version="base",
                                 **(trials[trial].params),
                                 output_dir=model_type,
                                 run_name=model_type,
@@ -177,12 +177,12 @@ if __name__ == "__main__":
                                           drop_low_support=True, test_split=None, seed=123)
         label_names = MulTweEmoDataset.get_labels(drop_low_support=True)
 
-        train = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=train, model="base", text_column="tweet", label_column="labels"))
-        val = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=val, model="base", text_column="tweet", label_column="labels"))
-        test = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=test, model="base", text_column="tweet", label_column="labels"))
+        train = Dataset.from_pandas(TweetMERModel.preprocess_dataset(dataset=train, model="base", text_column="tweet", label_column="labels"))
+        val = Dataset.from_pandas(TweetMERModel.preprocess_dataset(dataset=val, model="base", text_column="tweet", label_column="labels"))
+        test = Dataset.from_pandas(TweetMERModel.preprocess_dataset(dataset=test, model="base", text_column="tweet", label_column="labels"))
 
         manual_seed(seed)
-        model = TweetMSAWrapper(clip_version="base",
+        model = TweetMERWrapper(clip_version="base",
                                 **(trials[trial].params),
                                 batch_size=16,
                                 n_classes=6,
@@ -193,19 +193,19 @@ if __name__ == "__main__":
 
         metrics_function = compute_metrics
     
-    # trial ???
+    # trial 148
     elif model_type == "text_only":
         
         train = train.drop_duplicates(subset=["id"])
         val = val.drop_duplicates(subset=["id"])
         test = test.drop_duplicates(subset=["id"])
 
-        train = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=train, model="base", text_column="tweet", label_column="labels"))
-        val = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=val, model="base", text_column="tweet", label_column="labels"))
-        test = Dataset.from_pandas(TweetMSA.preprocess_dataset(dataset=test, model="base", text_column="tweet", label_column="labels"))
+        train = Dataset.from_pandas(TweetMERModel.preprocess_dataset(dataset=train, model="base", text_column="tweet", label_column="labels"))
+        val = Dataset.from_pandas(TweetMERModel.preprocess_dataset(dataset=val, model="base", text_column="tweet", label_column="labels"))
+        test = Dataset.from_pandas(TweetMERModel.preprocess_dataset(dataset=test, model="base", text_column="tweet", label_column="labels"))
 
         manual_seed(seed)
-        model = TweetMSAWrapper(clip_version="base",
+        model = TweetMERWrapper(clip_version="base",
                                 **(trials[trial].params),
                                 batch_size=16,
                                 text_only=True,

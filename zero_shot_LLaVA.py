@@ -3,7 +3,6 @@ from transformers import LlavaNextProcessor, LlavaNextForConditionalGeneration
 from PIL import Image
 import requests
 from io import BytesIO
-from libs.model import TweetMSAConfig
 import torch
 import numpy as np
 import argparse
@@ -58,7 +57,7 @@ if __name__ == "__main__":
                         "role": "user",
                         "content": [
                             {"type": "image"},
-                            {"type": "text", "text": prompt_format(row["tweet"])},
+                            {"type": "text", "text": prompt_format(row["tweet"], labels)},
                             ],
                     },
                 ]

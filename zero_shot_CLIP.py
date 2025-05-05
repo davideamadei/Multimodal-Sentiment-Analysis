@@ -3,7 +3,7 @@ from transformers import AutoModel, AutoProcessor
 from PIL import Image
 import requests
 from io import BytesIO
-from libs.model import TweetMSAConfig
+from libs.model import TweetMERConfig
 import torch
 import numpy as np
 import argparse
@@ -25,9 +25,9 @@ if __name__ == "__main__":
     predictions = []
 
     for feature_extractor in feature_extractors:
-        processor = AutoProcessor.from_pretrained(TweetMSAConfig.get_feature_extractor_name(feature_extractor), trust_remote_code=True)
+        processor = AutoProcessor.from_pretrained(TweetMERConfig.get_feature_extractor_name(feature_extractor), trust_remote_code=True)
 
-        model = AutoModel.from_pretrained(TweetMSAConfig.get_feature_extractor_name(feature_extractor), trust_remote_code=True)
+        model = AutoModel.from_pretrained(TweetMERConfig.get_feature_extractor_name(feature_extractor), trust_remote_code=True)
         model.to(device)
         mode="M"
         train, _ = MulTweEmoDataset.load(csv_path="./dataset/test_MulTweEmo.csv", mode=mode, drop_something_else=True, force_override=True, test_split=None, seed=123)
