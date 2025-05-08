@@ -9,10 +9,40 @@ from PIL import Image
 from io import BytesIO
 import pandas as pd
 import torch
+from optuna.trial import Trial
 
-class TweetMSAObjective(object):
+class TweetMERObjective(object):
+    """Objective callable class for TweetMER model hyperparameter optimization. To be used with Optuna, the initialization allows the class to be called
+    multiple times, with each call being a different trial, fitting the model with a different combination of hyperparameter values"""
     def __init__(self, clip_version="jina", append_captions:bool=False, process_emojis:bool=False, data_augment:bool=False, 
                 seed_threshold=0.82, n_classes:int=9, drop_low_support=False, mode="M", freeze_weights:bool=False, text_only:bool=False, seed:int=123):
+        """Initialization method for TweetMERObjective
+
+        Parameters
+        ----------
+        clip_version : str, optional
+            version of CLIP to use, by default "jina"
+        append_captions : bool, optional
+            if True captions are appended to the text of the dataset, by default False
+        process_emojis : bool, optional
+            if True emojis are replaced with their text representation, by default False
+        data_augment : bool, optional
+            if True the training set is augmented with data extracted from silver label only data, by default False
+        seed_threshold : float, optional
+            threshold controlling the labels of the data for augmentation, by default 0.82
+        n_classes : int, optional
+            number of possible classes, by default 9
+        drop_low_support : bool, optional
+            if True the classes with low support are not used, by default False
+        mode : str, optional
+            type of gold label used, "M" for multimodal and "T" for text-only, by default "M"
+        freeze_weights : bool, optional
+            if True the weights of the feature extractor are frozen, by default False
+        text_only : bool, optional
+            if True the model is trained using only text, by default False
+        seed : int, optional
+            seed controlling the RNG, by default 123
+        """
         if data_augment:
             train, _ = MulTweEmoDataset.load(csv_path="./dataset/train_MulTweEmo.csv", mode=mode, drop_something_else=True,
                                                 emoji_decoding=process_emojis, test_split=None, seed=seed)
@@ -41,6 +71,7 @@ class TweetMSAObjective(object):
         self.val, _ = MulTweEmoDataset.load(csv_path="./dataset/val_MulTweEmo.csv", drop_low_support=drop_low_support,
                                              mode=mode, drop_something_else=True, test_split=None, seed=seed)
 
+        # text only introduces duplicates which must be removed
         if text_only and not append_captions:
             self.train = self.train.drop_duplicates(subset=["id"])
             self.val = self.val.drop_duplicates(subset=["id"])
@@ -57,7 +88,19 @@ class TweetMSAObjective(object):
         self.drop_low_support = drop_low_support
         self.seed = seed
 
-    def __call__(self, trial):
+    def __call__(self, trial:Trial)->tuple[float,float,float]:
+        """Fit the model using the suggested values of hyperparameters
+
+        Parameters
+        ----------
+        trial : Trial
+            the Trial given by Optuna
+
+        Returns
+        -------
+        tuple[float,float,float]
+            a tuple containing results on validation set: loss, F1-score and subset accuracy
+        """
         n_epochs = trial.suggest_int("n_epochs", 2, 15, log=True)
         learning_rate = trial.suggest_float("learning_rate", 1e-5, 1e-2, log=True)
         warmup_steps = trial.suggest_int("warmup_steps", 0, 200, step=10)
@@ -88,8 +131,24 @@ class TweetMSAObjective(object):
         return results["loss"], results["f1_score"], results["exact_match"]
     
 class BertObjective(object):
-    
+    """Objective callable class for BERT model hyperparameter optimization. To be used with Optuna, the initialization allows the class to be called
+    multiple times, with each call being a different trial, fitting the model with a different combination of hyperparameter values"""
     def __init__(self, bert_version="bert-large-uncased", append_captions:bool=False, process_emojis:bool=False, mode="M", seed=123):
+        """Initialization method for BertObjective
+
+        Parameters
+        ----------
+        bert_version : str, optional
+            version of BERT to use, by default "bert-large-uncased"
+        append_captions : bool, optional
+            if True captions are appended to the text of the dataset, by default False
+        process_emojis : bool, optional
+            if True emojis are replaced with their text representation, by default False
+        mode : str, optional
+            type of gold label used, "M" for multimodal and "T" for text-only, by default "M"
+        seed : int, optional
+            seed controlling the RNG, by default 123
+        """
         self.bert_version = bert_version
         self.train, _ = MulTweEmoDataset.load(csv_path="./dataset/train_MulTweEmo.csv", mode=mode, drop_something_else=True,
                                                emoji_decoding=process_emojis, test_split=None, seed=seed)
@@ -98,6 +157,8 @@ class BertObjective(object):
         if append_captions:
             self.train["tweet"] = self.train.apply(lambda x: x["tweet"] + " " + x["caption"], axis=1)
             # self.val["tweet"] = self.val.apply(lambda x: x["tweet"] + " "  + x["caption"], axis=1)
+        
+        # text only introduces duplicates which must be removed
         else:
             self.train = self.train.drop_duplicates(subset=["id"])
             self.val = self.val.drop_duplicates(subset=["id"])
@@ -113,7 +174,19 @@ class BertObjective(object):
         self.seed = seed
 
 
-    def __call__(self, trial):
+    def __call__(self, trial:Trial)->tuple[float,float,float]:
+        """Fit the model using the suggested values of hyperparameters
+
+        Parameters
+        ----------
+        trial : Trial
+            the Trial given by Optuna
+
+        Returns
+        -------
+        tuple[float,float,float]
+            a tuple containing results on validation set: loss, F1-score and subset accuracy
+        """
         n_epochs = trial.suggest_int("n_epochs", 2, 15, log=True)
         learning_rate = trial.suggest_float("learning_rate", 1e-5, 1e-2, log=True)
         warmup_steps = trial.suggest_int("warmup_steps", 0, 200, step=10)
@@ -145,8 +218,20 @@ class BertObjective(object):
 
 
 class VitObjective(object):
-    
+    """Objective callable class for VIT model hyperparameter optimization. To be used with Optuna, the initialization allows the class to be called
+    multiple times, with each call being a different trial, fitting the model with a different combination of hyperparameter values"""
     def __init__(self, vit_version="google/vit-large-patch16-224-in21k", mode="M", seed=123):
+        """Initialization method for VitObjective
+
+        Parameters
+        ----------
+        vit_version : str, optional
+            version of ViT to use, by default "google/vit-large-patch16-224-in21k"
+        mode : str, optional
+            type of gold label used, "M" for multimodal and "T" for text-only, by default "M"
+        seed : int, optional
+            seed controlling the RNG, by default 123
+        """
         self.vit_version = vit_version
         self.train, _ = MulTweEmoDataset.load(csv_path="./dataset/train_MulTweEmo.csv", mode=mode, drop_something_else=True, test_split=None, seed=seed)
         self.val, _ = MulTweEmoDataset.load(csv_path="./dataset/val_MulTweEmo.csv", mode=mode, drop_something_else=True, test_split=None, seed=seed)
@@ -159,7 +244,19 @@ class VitObjective(object):
         self.val = self.val.map(self._preprocess_data, batched=True, remove_columns=[col for col in self.val.column_names if col != "labels"])
 
 
-    def __call__(self, trial):
+    def __call__(self, trial:Trial)->tuple[float,float,float]:
+        """Fit the model using the suggested values of hyperparameters
+
+        Parameters
+        ----------
+        trial : Trial
+            the Trial given by Optuna
+
+        Returns
+        -------
+        tuple[float,float,float]
+            a tuple containing results on validation set: loss, F1-score and subset accuracy
+        """
         n_epochs = trial.suggest_int("n_epochs", 2, 15, log=True)
         learning_rate = trial.suggest_float("learning_rate", 1e-5, 1e-2, log=True)
         warmup_steps = trial.suggest_int("warmup_steps", 0, 200, step=10)
@@ -203,11 +300,27 @@ class VitObjective(object):
         return encoding
 
 
-class TweetMSAObjectiveFinal(TweetMSAObjective):
+class TweetMERObjectiveFinal(TweetMERObjective):
+    """Objective callable class for TweetMER model final hyperparameter optimization. To be used with Optuna, the initialization allows the class to be called
+    multiple times, with each call being a different trial, fitting the model with a different combination of hyperparameter values"""
     def __init__(self, *args, **kwargs):
+        """Initialization method for TweetMERObjectiveFinal. Uses the same hyperparameters as TweetMERObjective
+        """
         super().__init__(*args, **kwargs)
 
-    def __call__(self, trial):
+    def __call__(self, trial:Trial)->tuple[float,float,float]:
+        """Fit the model using the suggested values of hyperparameters
+
+        Parameters
+        ----------
+        trial : Trial
+            the Trial given by Optuna
+
+        Returns
+        -------
+        tuple[float,float,float]
+            a tuple containing results on validation set: loss, F1-score and subset accuracy
+        """
         if self.append_captions:
             n_epochs = trial.suggest_int("n_epochs", 5, 15)
             learning_rate = trial.suggest_float("learning_rate", 1e-5, 5e-4, log=True)
@@ -255,10 +368,26 @@ class TweetMSAObjectiveFinal(TweetMSAObjective):
         return results["loss"], results["f1_score"], results["exact_match"]
 
 class BertObjectiveFinal(BertObjective):
+    """Objective callable class for BERT model final hyperparameter optimization. To be used with Optuna, the initialization allows the class to be called
+    multiple times, with each call being a different trial, fitting the model with a different combination of hyperparameter values"""
     def __init__(self, *args, **kwargs):
+        """Initialization method for BertObjectiveFinal. Uses the same hyperparameters as BertObjective
+        """
         super().__init__(*args, **kwargs)
 
-    def __call__(self, trial):
+    def __call__(self, trial:Trial)->tuple[float,float,float]:
+        """Fit the model using the suggested values of hyperparameters
+
+        Parameters
+        ----------
+        trial : Trial
+            the Trial given by Optuna
+
+        Returns
+        -------
+        tuple[float,float,float]
+            a tuple containing results on validation set: loss, F1-score and subset accuracy
+        """
         n_epochs = trial.suggest_int("n_epochs", 6, 15, log=True)
         learning_rate = trial.suggest_float("learning_rate", 1e-5, 5e-4, log=True)
         warmup_steps = trial.suggest_int("warmup_steps", 0, 200, step=10)
